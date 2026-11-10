@@ -1,0 +1,158 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: waha_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-whatsapp_marketing}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-whatsapp_marketing}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: waha_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: waha_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    ports:
+      - "127.0.0.1:${MINIO_API_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: cgr.dev/chainguard/minio-client:latest-dev
+    container_name: waha_minio_init
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 3;
+      mc alias set myminio http://minio:9000 $${MINIO_ROOT_USER:-minioadmin} $${MINIO_ROOT_PASSWORD:-minioadmin};
+      mc mb --ignore-existing myminio/$${MINIO_BUCKET:-whatsapp-media};
+      mc anonymous set download myminio/$${MINIO_BUCKET:-whatsapp-media};
+      exit 0;
+      "
+
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha_whatsapp
+    restart: unless-stopped
+    environment:
+      WAHA_ZIPPER: "false"
+      WAHA_PRINT_QR: "true"
+      WHATSAPP_START_SESSION: "default"
+      WHATSAPP_HOOK_URL: "http://backend:4000/api/webhooks/waha/incoming"
+      WHATSAPP_HOOK_EVENTS: "message,poll.vote,session.status"
+      WHATSAPP_DEFAULT_ENGINE: "WEBJS"
+      WHATSAPP_API_KEY: ${WAHA_API_KEY:-waha_secret_key}
+    ports:
+      - "127.0.0.1:${WAHA_PORT:-3000}:3000"
+    volumes:
+      - waha_sessions:/app/.sessions
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: waha_backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${BACKEND_PORT:-4000}:4000"
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-whatsapp_marketing}?schema=public
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-whatsapp-media}
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-http://localhost:9000/whatsapp-media}
+      WAHA_BASE_URL: http://waha:3000
+      WAHA_SESSION: ${WAHA_SESSION:-default}
+      WAHA_API_KEY: ${WAHA_API_KEY:-waha_secret_key}
+      BASE_REDIRECT_URL: ${BASE_REDIRECT_URL:-http://localhost:4000}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3.5-flash}
+      DAILY_NEWS_LIMIT: 50
+      DISPATCH_DELAY_MS: 30000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    container_name: waha_frontend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-3001}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+      DASHBOARD_USERNAME: ${DASHBOARD_USERNAME:-admin}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:-admin123}
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: waha_caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+      - backend
+
+volumes:
+  postgres_data:
+  redis_data:
+  minio_data:
+  waha_sessions:
+  caddy_data:
+  caddy_config:
+

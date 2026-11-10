@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum GroupRole {
+  SOURCE
+  DESTINATION
+  NONE
+}
+
+enum ChannelType {
+  NEWS
+  DARAZ
+}
+
+enum PostStatus {
+  PENDING
+  PENDING_APPROVAL
+  PROCESSING
+  SENT
+  REJECTED
+  DUPLICATE
+  FAILED
+}
+
+enum EngagementType {
+  REACTION
+  CLICK
+}
+
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model Group {
+  id         String      @id @default(cuid())
+  wahaChatId String      @unique
+  name       String
+  role       GroupRole   @default(NONE)
+  type       ChannelType @default(DARAZ)
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+
+  destinationPosts Post[] @relation("DestinationGroupPosts")
+
+  @@index([role, type, isActive])
+}
+
+model Post {
+  id                 String         @id @default(cuid())
+  sourceRef          String?
+  destinationGroupId String?
+  destinationGroup   Group?         @relation("DestinationGroupPosts", fields: [destinationGroupId], references: [id], onDelete: SetNull)
+  type               ChannelType    @default(DARAZ)
+  rawPayload         Json
+  processedText      String?        @db.Text
+  mediaUrl           String?
+  status             PostStatus     @default(PENDING_APPROVAL)
+  duplicateReason    String?
+  wahaMessageId      String?        @unique
+  pollMessageId      String?        @unique
+  sentAt             DateTime?
+  clicksCount        Int            @default(0)
+  reactionsCount     Int            @default(0)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  engagements        Engagement[]
+
+  @@index([status, type, createdAt])
+  @@index([sentAt])
+  @@index([pollMessageId])
+}
+
+model Engagement {
+  id         String         @id @default(cuid())
+  postId     String
+  post       Post           @relation(fields: [postId], references: [id], onDelete: Cascade)
+  type       EngagementType
+  recordedAt DateTime       @default(now())
+  metadata   Json?
+
+  @@index([postId, type])
+  @@index([type, recordedAt])
+}

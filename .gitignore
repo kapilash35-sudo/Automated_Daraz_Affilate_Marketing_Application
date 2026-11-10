@@ -1,0 +1,58 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build Outputs
+dist/
+build/
+.next/
+out/
+
+# Environment Variables (CRITICAL: Never commit secrets)
+.env
+.env.*
+.env*.local
+.env.production
+.env.staging
+backend/.env
+frontend/.env.local
+*.env
+
+# Exception: Allow .env.example template
+!.env.example
+
+# Credentials, Keys & Certificates
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+
+# WAHA WhatsApp Sessions & Browser Profiles
+.sessions/
+waha_sessions/
+
+# Docker Local Data Volumes
+postgres_data/
+redis_data/
+minio_data/
+caddy_data/
+caddy_config/
+
+# Logs & Temporary Files
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+tmp/
+temp/
+
+# OS & Editor Metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+

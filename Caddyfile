@@ -1,0 +1,21 @@
+{$DOMAIN:localhost} {
+    # Backend routes
+    handle /api/* {
+        reverse_proxy backend:4000
+    }
+    handle /r/* {
+        reverse_proxy backend:4000
+    }
+    handle /docs* {
+        reverse_proxy backend:4000
+    }
+    handle /openapi.json {
+        reverse_proxy backend:4000
+    }
+
+    # Frontend Next.js routes
+    handle {
+        reverse_proxy frontend:3000
+    }
+}
+
