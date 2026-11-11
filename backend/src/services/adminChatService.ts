@@ -16,6 +16,8 @@ export interface AdminConversationState {
     | 'AWAITING_DEAL_TEXT'
     | 'AWAITING_COMMISSION'
     | 'AWAITING_NEW_GROUP_LINK'
+    | 'AWAITING_TAMIL_GROUP_LINK'
+    | 'AWAITING_SINHALA_GROUP_LINK'
     | 'AWAITING_APPROVAL';
   uploadedMediaUrl?: string;
   photoMode?: 'MANUAL' | 'AUTO' | 'NONE';
@@ -330,6 +332,7 @@ export class AdminChatService {
           if (post) {
             const payload: any = post.rawPayload || {};
             const communityInviteUrl = await SettingsService.get('communityInviteUrl');
+            const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
             await wahaClient.sendTextMessage(formattedChatId, `⏳ *Gemini மூலம் புதிய தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...*`);
 
@@ -341,6 +344,7 @@ export class AdminChatService {
               discountPercentage: payload.discountPercentage,
               affiliateRedirectUrl: trackingUrl,
               communityInviteUrl,
+              communityInviteUrlSinhala,
             });
 
             await prisma.post.update({
@@ -432,10 +436,18 @@ export class AdminChatService {
         choice.includes('update link') ||
         choice === 'link'
       ) {
+        const tamilLink = await SettingsService.get('communityInviteUrl');
+        const sinhalaLink = await SettingsService.get('communityInviteUrlSinhala');
         await this.setState(cleanFrom, { state: 'AWAITING_NEW_GROUP_LINK' });
         await wahaClient.sendTextMessage(
           formattedChatId,
-          `🔗 *உங்கள் புதிய WhatsApp குரூப் Invite Link-ஐ இப்போது இங்கே மெசேஜ் செய்யுங்கள்...*\n(எ.கா: https://chat.whatsapp.com/XXXXX)`
+          `🔗 *குரூப் இன்வைட் லிங்க் மாற்றம் (Community Link Settings)*\n\n` +
+          `📌 *1. தமிழ் குரூப் லிங்க்:*\n👉 ${tamilLink || 'இன்னும் அமைக்கப்படவில்லை'}\n\n` +
+          `📌 *2. சிங்கள குரூப் லிங்க்:*\n👉 ${sinhalaLink || 'இன்னும் அமைக்கப்படவில்லை'}\n\n` +
+          `எந்த லிங்கை மாற்ற வேண்டும்?\n` +
+          `1️⃣ *தமிழ் குரூப் லிங்க் மாற்ற* (Reply 1)\n` +
+          `2️⃣ *சிங்கள குரூப் லிங்க் மாற்ற* (Reply 2)\n\n` +
+          `_அல்லது புதிய லிங்கை நேரடியாக அனுப்பவும் (எ.கா: https://chat.whatsapp.com/...)_`
         );
         return true;
       }
@@ -527,8 +539,9 @@ export class AdminChatService {
         `✅ *உண்மையான கமிஷன்: Rs. ${commissionAmount} பதிவு செய்யப்பட்டது!*\nGemini மூலம் தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...`
       );
 
-      // Get active community invite link
+      // Get active community invite links
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
+      const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
       // Count active destination groups
       const destinationGroups = await prisma.group.findMany({
@@ -562,6 +575,7 @@ export class AdminChatService {
         discountPercentage: dealData.discountPercentage,
         affiliateRedirectUrl: trackingUrl,
         communityInviteUrl,
+        communityInviteUrlSinhala,
       });
 
       // Update post with the final AI promotional copies
@@ -614,6 +628,50 @@ export class AdminChatService {
 
     // 4. State: AWAITING_NEW_GROUP_LINK
     if (currentState.state === 'AWAITING_NEW_GROUP_LINK') {
+      const lower = text.trim().toLowerCase();
+      if (lower === '1' || lower.includes('tamil') || lower.includes('தமிழ்')) {
+        await this.setState(cleanFrom, { state: 'AWAITING_TAMIL_GROUP_LINK' });
+        await wahaClient.sendTextMessage(
+          formattedChatId,
+          `🇱🇰 *புதிய தமிழ் WhatsApp குரூப் Invite Link-ஐ அனுப்பவும்...*\n(எ.கா: https://chat.whatsapp.com/XXXXX)`
+        );
+        return true;
+      }
+
+      if (lower === '2' || lower.includes('sinhala') || lower.includes('சிங்கள')) {
+        await this.setState(cleanFrom, { state: 'AWAITING_SINHALA_GROUP_LINK' });
+        await wahaClient.sendTextMessage(
+          formattedChatId,
+          `🇱🇰 *புதிய சிங்கள WhatsApp குரூப் Invite Link-ஐ அனுப்பவும்...*\n(எ.கா: https://chat.whatsapp.com/XXXXX)`
+        );
+        return true;
+      }
+
+      const linkMatch = text.match(/(https?:\/\/chat\.whatsapp\.com\/[^\s]+)/i);
+      if (linkMatch) {
+        const newUrl = linkMatch[0].trim();
+        const isSinhala = lower.includes('sinhala') || lower.includes('sin') || lower.includes('சிங்கள');
+        const settingKey = isSinhala ? 'communityInviteUrlSinhala' : 'communityInviteUrl';
+        const langLabel = isSinhala ? 'சிங்கள (Sinhala)' : 'தமிழ் (Tamil)';
+
+        await SettingsService.set(settingKey, newUrl);
+        await this.resetState(cleanFrom);
+
+        await wahaClient.sendTextMessage(
+          formattedChatId,
+          `✅ *புதிய ${langLabel} குரூப் லிங்க் வெற்றிகரமாக மாற்றப்பட்டது!*\n\n🔗 *புதிய லிங்க்:* ${newUrl}\n\nஇனி வரும் விளம்பரங்களின் கீழ் இந்த லிங்க் தானாகவே சேர்க்கப்படும்.`
+        );
+        return true;
+      }
+
+      await wahaClient.sendTextMessage(
+        formattedChatId,
+        `⚠️ தயவுசெய்து '1' (தமிழ் லிங்க்) அல்லது '2' (சிங்கள லிங்க்) என தெரிவு செய்யவும் அல்லது நேரடியாக Link-ஐ அனுப்பவும்.`
+      );
+      return true;
+    }
+
+    if (currentState.state === 'AWAITING_TAMIL_GROUP_LINK') {
       const linkMatch = text.match(/(https?:\/\/chat\.whatsapp\.com\/[^\s]+)/i);
       if (linkMatch) {
         const newUrl = linkMatch[0].trim();
@@ -622,7 +680,28 @@ export class AdminChatService {
 
         await wahaClient.sendTextMessage(
           formattedChatId,
-          `✅ *புதிய குரூப் லிங்க் வெற்றிகரமாக மாற்றப்பட்டது!*\n\n🔗 *புதிய லிங்க்:* ${newUrl}\n\nஇனி வரும் அனைத்து விளம்பரங்களின் கீழும் இந்த புதிய லிங்க் தானாகவே சேர்க்கப்படும்.`
+          `✅ *தமிழ் குரூப் லிங்க் வெற்றிகரமாக மாற்றப்பட்டது!*\n\n🔗 *புதிய தமிழ் லிங்க்:* ${newUrl}\n\nஇனி வரும் தமிழ் விளம்பரங்களின் கீழ் இந்த லிங்க் தானாகவே சேர்க்கப்படும்.`
+        );
+        return true;
+      }
+
+      await wahaClient.sendTextMessage(
+        formattedChatId,
+        `⚠️ *செல்லுபடியாகும் WhatsApp குரூப் லிங்கை அனுப்புங்கள்.*\n(எ.கா: https://chat.whatsapp.com/GzBDeals123)`
+      );
+      return true;
+    }
+
+    if (currentState.state === 'AWAITING_SINHALA_GROUP_LINK') {
+      const linkMatch = text.match(/(https?:\/\/chat\.whatsapp\.com\/[^\s]+)/i);
+      if (linkMatch) {
+        const newUrl = linkMatch[0].trim();
+        await SettingsService.set('communityInviteUrlSinhala', newUrl);
+        await this.resetState(cleanFrom);
+
+        await wahaClient.sendTextMessage(
+          formattedChatId,
+          `✅ *சிங்கள குரூப் லிங்க் வெற்றிகரமாக மாற்றப்பட்டது!*\n\n🔗 *புதிய சிங்கள லிங்க்:* ${newUrl}\n\nஇனி வரும் சிங்கள விளம்பரங்களின் கீழ் இந்த லிங்க் தானாகவே சேர்க்கப்படும்.`
         );
         return true;
       }

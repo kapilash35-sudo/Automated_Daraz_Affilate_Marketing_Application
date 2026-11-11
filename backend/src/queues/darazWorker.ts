@@ -35,6 +35,7 @@ export function createDarazWorker() {
       // 2. Resolve URLs
       const directAffiliateUrl = payload.exactAffiliateUrl || post.sourceRef || '';
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
+      const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
       const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${postId}`;
 
       // 3. Resolve Ad Promotional Copies (Tamil & Sinhala):
@@ -52,6 +53,7 @@ export function createDarazWorker() {
           productDetails: payload.productDetails || payload.description,
           category: payload.category,
           communityInviteUrl: communityInviteUrl || undefined,
+          communityInviteUrlSinhala: communityInviteUrlSinhala || undefined,
         });
 
         if (!formattedTextTamil || !formattedTextTamil.trim()) formattedTextTamil = bilingual.tamilText;

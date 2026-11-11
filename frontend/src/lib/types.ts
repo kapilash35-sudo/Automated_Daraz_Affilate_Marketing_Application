@@ -42,6 +42,7 @@ export interface WhatsAppQRResponse {
 export interface SystemSettings {
   adminPhone: string;
   communityInviteUrl: string;
+  communityInviteUrlSinhala?: string;
   autoApprove: string;
   conversionRate: string;
   avgCommission: string;

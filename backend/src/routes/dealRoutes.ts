@@ -127,8 +127,9 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-      // Get active community invite link
+      // Get active community invite links (Tamil & Sinhala)
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
+      const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
       // Create post first to acquire unique postId
       const post = await prisma.post.create({
@@ -153,6 +154,7 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         discountPercentage: dealData.discountPercentage,
         affiliateRedirectUrl: trackingUrl,
         communityInviteUrl,
+        communityInviteUrlSinhala,
       });
 
       await prisma.post.update({

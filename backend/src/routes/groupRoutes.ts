@@ -131,7 +131,7 @@ export const groupRoutes: FastifyPluginAsync = async (fastify) => {
 
           if (!existing) {
             const groupName = chat.name || `WhatsApp Group (${chatId.slice(0, 12)})`;
-            const isSinhala = /[\u0D80-\u0DFF]/i.test(groupName) || /sinhala/i.test(groupName);
+            const isSinhala = /[\u0D80-\u0DFF]/i.test(groupName) || /sinhala|\[sin\]|\(sin\)|\bsin\b/i.test(groupName);
 
             await prisma.group.create({
               data: {
@@ -144,11 +144,22 @@ export const groupRoutes: FastifyPluginAsync = async (fastify) => {
               },
             });
             importedCount++;
-          } else if (chat.name && chat.name !== existing.name) {
-            await prisma.group.update({
-              where: { id: existing.id },
-              data: { name: chat.name },
-            });
+          } else {
+            const groupName = chat.name || existing.name;
+            const isSinhala = /[\u0D80-\u0DFF]/i.test(groupName) || /sinhala|\[sin\]|\(sin\)|\bsin\b/i.test(groupName);
+            const updates: any = {};
+            if (chat.name && chat.name !== existing.name) {
+              updates.name = chat.name;
+            }
+            if (isSinhala && existing.language === 'TAMIL') {
+              updates.language = 'SINHALA';
+            }
+            if (Object.keys(updates).length > 0) {
+              await prisma.group.update({
+                where: { id: existing.id },
+                data: updates,
+              });
+            }
           }
         } catch (innerErr: any) {
           fastify.log.warn(`[GroupSync] Skip chat ${chatId}: ${innerErr.message}`);

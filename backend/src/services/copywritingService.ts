@@ -17,6 +17,7 @@ export interface DarazCopywritingInput {
   productDetails?: string;
   category?: string;
   communityInviteUrl?: string;
+  communityInviteUrlSinhala?: string;
 }
 
 export class CopywritingService {
@@ -160,6 +161,8 @@ Return ONLY the final WhatsApp message text. Do not wrap in markdown code fences
       return this.formatDarazSinhalaFallback(input);
     }
 
+    const sinhalaCommunityUrl = input.communityInviteUrlSinhala || input.communityInviteUrl;
+
     const prompt = `You are an expert e-commerce affiliate marketing copywriter specializing in viral, high-converting WhatsApp deal alerts for Daraz Sri Lanka shoppers.
 Your goal is to write a catchy, fresh, and modern WhatsApp promotion message in natural, conversational Sinhala mixed with common shopping English (Singlish style).
 
@@ -202,7 +205,7 @@ CRITICAL COPYWRITING & TONE RULES:
 
 6. COMMUNITY INVITE & URGENCY FOOTER:
    ⚠️ *Limited Stock! Offer එක ඉවර වෙන්න කලින් ඉක්මන් කරන්න!*
-   ${input.communityInviteUrl ? `\n📲 *මෙවැනිම සුපිරි Offers සහ Deals දිනපතා ලබාගැනීමට අපගේ WhatsApp සමූහයට එක්වන්න:*\n👉 ${input.communityInviteUrl}` : ''}
+   ${sinhalaCommunityUrl ? `\n📲 *මෙවැනිම සුපිරි Offers සහ Deals දිනපතා ලබාගැනීමට අපගේ WhatsApp සමූහයට එක්වන්න:*\n👉 ${sinhalaCommunityUrl}` : ''}
 
 7. FORMATTING:
    - Use WhatsApp markdown (*bold*, _italics_).
@@ -276,6 +279,7 @@ ${input.communityInviteUrl ? `\n📲 *மேலும் அதிரடி த�
   }
 
   private formatDarazSinhalaFallback(input: DarazCopywritingInput): string {
+    const sinhalaCommunityUrl = input.communityInviteUrlSinhala || input.communityInviteUrl;
     return `⚡ *විශේෂ මිල අඩුකිරීමක්!* ⚡
 
 *${input.title}*
@@ -290,7 +294,7 @@ ${input.discountPercentage ? `🔥 *වට්ටම: ${input.discountPercentage}
 
 👉 *දැන්ම Order කිරීමට මෙතන Click කරන්න:*
 🔗 ${input.affiliateRedirectUrl}
-${input.communityInviteUrl ? `\n📲 *තවත් මෙවැනි විශේෂ Offer විස්තර உடனுக்குடன் ලබාගැනීමට අපගේ WhatsApp Group එකට එකතු වන්න:*\n👉 ${input.communityInviteUrl}` : ''}
+${sinhalaCommunityUrl ? `\n📲 *තවත් මෙවැනි විශේෂ Offer විස්තර දිනපතා ලබාගැනීමට අපගේ WhatsApp Group එකට එකතු වන්න:*\n👉 ${sinhalaCommunityUrl}` : ''}
 
 ⚠️ _සීමිත තොග ප්‍රමාණයක් පමණි! අවස්ථාව මගනොහරින්න!_`;
   }

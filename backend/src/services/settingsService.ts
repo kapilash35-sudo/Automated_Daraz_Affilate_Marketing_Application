@@ -4,6 +4,7 @@ export class SettingsService {
   private static defaultSettings: Record<string, string> = {
     adminPhone: '',
     communityInviteUrl: 'https://chat.whatsapp.com/',
+    communityInviteUrlSinhala: 'https://chat.whatsapp.com/',
     autoApprove: 'false',
     conversionRate: '0.025',
     avgCommission: '380',
