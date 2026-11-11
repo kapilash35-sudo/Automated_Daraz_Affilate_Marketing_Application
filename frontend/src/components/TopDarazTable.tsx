@@ -9,6 +9,7 @@ interface TopProductItem {
   originalPrice?: number | string;
   discountPrice: number | string;
   discountPercentage?: number | string;
+  commissionAmount?: number;
   clicksCount: number;
   estimatedRevenue: number;
   mediaUrl: string | null;
@@ -51,6 +52,7 @@ export function TopDarazTable({ items, apiBaseUrl = 'http://localhost:4000' }: T
               <th className="pb-3 font-semibold">Product Deal</th>
               <th className="pb-3 font-semibold text-right">Offer Price</th>
               <th className="pb-3 font-semibold text-center">Discount</th>
+              <th className="pb-3 font-semibold text-right">Bot Comm.</th>
               <th className="pb-3 font-semibold text-right">Clicks</th>
               <th className="pb-3 font-semibold text-right">Est. Comm.</th>
               <th className="pb-3 font-semibold text-center">Tracking URL</th>
@@ -102,6 +104,9 @@ export function TopDarazTable({ items, apiBaseUrl = 'http://localhost:4000' }: T
                   ) : (
                     <span className="text-xs text-slate-400">—</span>
                   )}
+                </td>
+                <td className="py-3.5 text-right font-mono text-xs font-bold text-slate-800">
+                  {item.commissionAmount ? `Rs. ${item.commissionAmount}` : '—'}
                 </td>
                 <td className="py-3.5 text-right">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200 text-xs font-bold font-mono">

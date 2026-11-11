@@ -10,7 +10,6 @@ import {
   ShoppingBag,
   MousePointerClick,
   DollarSign,
-  TrendingUp,
   Tag,
 } from 'lucide-react';
 import { fetchDarazAnalytics, fetchSettings } from '../../lib/api';
@@ -19,13 +18,12 @@ import { DarazAnalyticsResponse } from '../../lib/types';
 export default function AnalyticsPage() {
   const [data, setData] = useState<DarazAnalyticsResponse | null>(null);
   const [conversionRate, setConversionRate] = useState(0.025);
-  const [avgCommission, setAvgCommission] = useState(380);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async (convRate = conversionRate, comm = avgCommission) => {
+  const loadData = async (convRate = conversionRate) => {
     setIsLoading(true);
     try {
-      const res = await fetchDarazAnalytics(convRate.toString(), comm.toString());
+      const res = await fetchDarazAnalytics(convRate.toString());
       setData(res);
     } catch (err: any) {
       console.error('Failed to load Daraz analytics:', err.message);
@@ -38,9 +36,8 @@ export default function AnalyticsPage() {
     const init = async () => {
       try {
         const settings = await fetchSettings().catch(() => null);
-        if (settings) {
-          if (settings.conversionRate) setConversionRate(parseFloat(settings.conversionRate));
-          if (settings.avgCommission) setAvgCommission(parseFloat(settings.avgCommission));
+        if (settings && settings.conversionRate) {
+          setConversionRate(parseFloat(settings.conversionRate));
         }
       } catch {}
       await loadData();
@@ -48,17 +45,17 @@ export default function AnalyticsPage() {
     init();
   }, []);
 
-  const handleParametersChange = (rate: number, comm: number) => {
+  const handleConversionRateChange = (rate: number) => {
     setConversionRate(rate);
-    setAvgCommission(comm);
+    loadData(rate);
   };
 
   return (
     <div className="space-y-8">
       <Header
         title="Revenue & Performance Analytics"
-        subtitle="Track affiliate link click volume, buyer peak engagement hours, and projected commission earnings."
-        onRefresh={() => loadData(conversionRate, avgCommission)}
+        subtitle="Track affiliate link click volume, buyer peak engagement hours, and actual projected commission earnings."
+        onRefresh={() => loadData(conversionRate)}
         isLoading={isLoading}
       />
 
@@ -93,25 +90,23 @@ export default function AnalyticsPage() {
           title="Expected Commission"
           value={
             data
-              ? `Rs. ${Math.round(
-                  data.summary.totalClicks * conversionRate * avgCommission
-                ).toLocaleString()}`
+              ? `Rs. ${data.summary.expectedCommission.toLocaleString()}`
               : '—'
           }
-          subtitle={`Rs. ${avgCommission} avg / order`}
+          subtitle="Real-time Bot Commissions"
           icon={DollarSign}
           color="emerald"
           trend="Projected Payout"
         />
       </div>
 
-      {/* Interactive Revenue Estimator Slider Widget */}
+      {/* Interactive Revenue Estimator Slider Widget (Conversion Rate Only) */}
       {data && (
         <RevenueCalculator
           totalClicks={data.summary.totalClicks}
+          expectedCommission={data.summary.expectedCommission}
           initialConversionRate={conversionRate}
-          initialAvgCommission={avgCommission}
-          onParametersChange={handleParametersChange}
+          onConversionRateChange={handleConversionRateChange}
         />
       )}
 
@@ -130,4 +125,3 @@ export default function AnalyticsPage() {
     </div>
   );
 }
-
