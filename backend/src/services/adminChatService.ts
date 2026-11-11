@@ -303,9 +303,12 @@ export class AdminChatService {
           rawPayload: {},
         });
 
+        const tamilCount = destinationGroups.filter(g => g.language === 'TAMIL' || g.language === 'ALL').length;
+        const sinhalaCount = destinationGroups.filter(g => g.language === 'SINHALA' || g.language === 'ALL').length;
+
         await wahaClient.sendTextMessage(
           formattedChatId,
-          `🚀 *விளம்பரம் ஒப்புதல் அளிக்கப்பட்டது!*\n\nவிளம்பரம் *${destinationGroups.length} குரூப்களுக்கும்* 30 விநாடி இடைவெளியில் அனுப்பப்பட்டு வருகிறது.`
+          `🚀 *விளம்பரம் ஒப்புதல் அளிக்கப்பட்டது!*\n\nவிளம்பரம் *${destinationGroups.length} குரூப்களுக்கும்* (${tamilCount} தமிழ் + ${sinhalaCount} சிங்களம்) 30 விநாடி இடைவெளியில் அனுப்பப்பட்டு வருகிறது.`
         );
 
         await this.resetState(cleanFrom);
@@ -328,10 +331,10 @@ export class AdminChatService {
             const payload: any = post.rawPayload || {};
             const communityInviteUrl = await SettingsService.get('communityInviteUrl');
 
-            await wahaClient.sendTextMessage(formattedChatId, `⏳ *Gemini 3.5 மூலம் புதிய விளம்பரம் தயாராகிறது...*`);
+            await wahaClient.sendTextMessage(formattedChatId, `⏳ *Gemini மூலம் புதிய தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...*`);
 
             const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
-            const newCopy = await copywritingService.formatDarazDealForWhatsApp({
+            const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
               title: payload.title,
               originalPrice: payload.originalPrice,
               discountPrice: payload.discountPrice,
@@ -342,27 +345,40 @@ export class AdminChatService {
 
             await prisma.post.update({
               where: { id: post.id },
-              data: { processedText: newCopy },
+              data: {
+                processedText: tamilText,
+                processedTextSinhala: sinhalaText,
+              },
             });
 
-            const commInfo = payload.commissionAmount ? `\n\n💰 *உண்மையான கமிஷன்:* Rs. ${payload.commissionAmount} / order` : '';
-            const previewText = `${newCopy}${commInfo}`;
+            const destinationGroups = await prisma.group.findMany({
+              where: { role: 'DESTINATION', type: 'DARAZ', isActive: true },
+            });
+            const tamilCount = destinationGroups.filter(g => g.language === 'TAMIL' || g.language === 'ALL').length;
+            const sinhalaCount = destinationGroups.filter(g => g.language === 'SINHALA' || g.language === 'ALL').length;
+
+            const commAmount = payload.commissionAmount || 0;
+            const previewHeader = `📸 *புதிய விளம்பர மாதிரி (New Ad Preview)*\n\n💰 *உண்மையான கமிஷன்:* Rs. ${commAmount} / order\n👥 *சென்றடையும் குரூப்கள்:* ${tamilCount} தமிழ் | ${sinhalaCount} சிங்களம்`;
 
             if (post.mediaUrl && post.mediaUrl !== 'NONE') {
               await wahaClient.sendFileMessage(
                 formattedChatId,
                 post.mediaUrl,
-                previewText,
+                previewHeader,
                 'product.jpg',
                 'image/jpeg'
               );
-            } else {
-              await wahaClient.sendTextMessage(formattedChatId, previewText);
             }
 
-            const destinationGroups = await prisma.group.findMany({
-              where: { role: 'DESTINATION', type: 'DARAZ', isActive: true },
-            });
+            // Send Tamil & Sinhala copies
+            await wahaClient.sendTextMessage(
+              formattedChatId,
+              `🇱🇰 *[தமிழ் விளம்பரம் - Tamil Copy]*\n━━━━━━━━━━━━━━━━━━━━\n${tamilText}`
+            );
+            await wahaClient.sendTextMessage(
+              formattedChatId,
+              `🇱🇰 *[சிங்கள விளம்பரம் - Sinhala Copy]*\n━━━━━━━━━━━━━━━━━━━━\n${sinhalaText}`
+            );
 
             await this.sendApprovalMenu(formattedChatId, destinationGroups.length, post.id);
             return true;
@@ -508,7 +524,7 @@ export class AdminChatService {
 
       await wahaClient.sendTextMessage(
         formattedChatId,
-        `✅ *உண்மையான கமிஷன்: Rs. ${commissionAmount} பதிவு செய்யப்பட்டது!*\nGemini மூலம் கவர்ச்சிகரமான தமிழ் விளம்பரம் தயாராகிறது...`
+        `✅ *உண்மையான கமிஷன்: Rs. ${commissionAmount} பதிவு செய்யப்பட்டது!*\nGemini மூலம் தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...`
       );
 
       // Get active community invite link
@@ -518,6 +534,8 @@ export class AdminChatService {
       const destinationGroups = await prisma.group.findMany({
         where: { role: 'DESTINATION', type: 'DARAZ', isActive: true },
       });
+      const tamilCount = destinationGroups.filter((g) => g.language === 'TAMIL' || g.language === 'ALL').length;
+      const sinhalaCount = destinationGroups.filter((g) => g.language === 'SINHALA' || g.language === 'ALL').length;
 
       // Save Post as PENDING_APPROVAL in database first to get unique postId
       const finalMediaUrl = (dealData.mediaUrl && dealData.mediaUrl !== 'NONE') ? dealData.mediaUrl : null;
@@ -529,14 +547,15 @@ export class AdminChatService {
           status: 'PENDING_APPROVAL',
           rawPayload: dealData as any,
           processedText: '',
+          processedTextSinhala: '',
         },
       });
 
       // Generate Official Tracking Redirect URL
       const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
 
-      // AI Copywriting with Gemini using tracking URL
-      const formattedAd = await copywritingService.formatDarazDealForWhatsApp({
+      // AI Copywriting with Gemini: generate both in parallel
+      const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
         title: dealData.title,
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
@@ -545,25 +564,41 @@ export class AdminChatService {
         communityInviteUrl,
       });
 
-      // Update post with the final AI promotional copy containing tracking URL
+      // Update post with the final AI promotional copies
       await prisma.post.update({
         where: { id: post.id },
-        data: { processedText: formattedAd },
+        data: {
+          processedText: tamilText,
+          processedTextSinhala: sinhalaText,
+        },
       });
 
-      // Send Preview Message: Image (Photo) if available, or clean text
-      const previewCaption = `${formattedAd}\n\n💰 *உண்மையான கமிஷன்:* Rs. ${commissionAmount} / order`;
+      // Send Preview Message: Image (Photo) if available with summary
+      const previewHeader = `📸 *தயாரிப்பு மாதிரி (Product Preview)*\n\n💰 *உண்மையான கமிஷன்:* Rs. ${commissionAmount} / order\n👥 *சென்றடையும் குரூப்கள்:* ${tamilCount} தமிழ் குரூப் | ${sinhalaCount} சிங்கள குரூப்`;
+
       if (finalMediaUrl) {
         await wahaClient.sendFileMessage(
           formattedChatId,
           finalMediaUrl,
-          previewCaption,
+          previewHeader,
           'product.jpg',
           'image/jpeg'
         );
       } else {
-        await wahaClient.sendTextMessage(formattedChatId, previewCaption);
+        await wahaClient.sendTextMessage(formattedChatId, previewHeader);
       }
+
+      // Send Tamil Copy Preview
+      await wahaClient.sendTextMessage(
+        formattedChatId,
+        `🇱🇰 *[தமிழ் விளம்பரம் - Tamil Copy]*\n━━━━━━━━━━━━━━━━━━━━\n${tamilText}`
+      );
+
+      // Send Sinhala Copy Preview
+      await wahaClient.sendTextMessage(
+        formattedChatId,
+        `🇱🇰 *[சிங்கள விளம்பரம் - Sinhala Copy]*\n━━━━━━━━━━━━━━━━━━━━\n${sinhalaText}`
+      );
 
       // Send Approval Menu (Poll)
       await this.sendApprovalMenu(formattedChatId, destinationGroups.length, post.id);

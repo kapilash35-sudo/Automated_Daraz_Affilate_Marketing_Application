@@ -14,13 +14,16 @@
 
 ## 📖 Overview
 
-The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated marketing infrastructure designed for digital publishers and affiliate marketers. It streamlines the end-to-end workflow of discovering e-commerce deals, generating persuasive bilingual marketing copy with generative AI, acquiring instant approval via WhatsApp polls, broadcasting promotional messages to WhatsApp communities, and tracking buyer conversions in real-time.
+The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated marketing infrastructure designed for digital publishers and affiliate marketers. It streamlines the end-to-end workflow of discovering e-commerce deals, generating persuasive bilingual (Tamil & Sinhala) marketing copy with generative AI, acquiring instant approval via WhatsApp polls, broadcasting targeted promotions to segregated Tamil and Sinhala WhatsApp communities, and tracking buyer conversions in real-time.
 
 ---
 
 ## 🌟 Key Capabilities
 
-### 1. Interactive WhatsApp Admin Bot
+### 1. Bilingual AI Copywriting & Multi-Language Segmentation
+- **Dual-Language Generation:** Concurrently drafts tailored promotional copy in both Tamil (Tanglish) and Sinhala (Singlish) using Google Gemini AI.
+- **Language-Targeted Dispatch:** Automatically routes Tamil promotional ads to Tamil subscriber groups and Sinhala ads to Sinhala groups.
+- **Smart Group Classification:** Dashboard and automated ingester support segmenting groups into Tamil, Sinhala, or Bilingual destinations.
 - **Zero-Dashboard Operation:** Manage the entire marketing lifecycle directly within WhatsApp.
 - **Dynamic Control Menus:** Interactive voting polls for initiating deals, updating community links, and checking performance metrics.
 - **Product Extraction:** Automatically parses product titles, original prices, discounted prices, discount percentages, and media assets.

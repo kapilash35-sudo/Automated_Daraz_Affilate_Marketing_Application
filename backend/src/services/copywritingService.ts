@@ -151,6 +151,95 @@ Return ONLY the final WhatsApp message text. Do not wrap in markdown code fences
     }
   }
 
+  /**
+   * Generates an irresistible WhatsApp Flash Deal promo in Sinhala (Singlish / Conversational Sinhala)
+   * for Daraz Sri Lanka shoppers.
+   */
+  async formatDarazDealSinhalaForWhatsApp(input: DarazCopywritingInput): Promise<string> {
+    if (!this.ai) {
+      return this.formatDarazSinhalaFallback(input);
+    }
+
+    const prompt = `You are an expert e-commerce affiliate marketing copywriter specializing in viral, high-converting WhatsApp deal alerts for Daraz Sri Lanka shoppers.
+Your goal is to write a catchy, fresh, and modern WhatsApp promotion message in natural, conversational Sinhala mixed with common shopping English (Singlish style).
+
+PRODUCT DETAILS:
+Title: ${input.title}
+Original Price: ${input.originalPrice ? `Rs. ${input.originalPrice}` : 'N/A'}
+Offer Price: ${input.discountPrice ? `Rs. ${input.discountPrice}` : 'N/A'}
+Discount: ${input.discountPercentage ? `${input.discountPercentage}% OFF` : 'Super Deal!'}
+Tracking Link: ${input.affiliateRedirectUrl}
+Features/Details: ${input.productDetails || 'ඉහළම තත්ත්වයේ නිෂ්පාදනයක්'}
+
+CRITICAL COPYWRITING & TONE RULES:
+1. DYNAMIC CATCHY HOOK:
+   - Create a UNIQUE, exciting opening headline tailored to the product type, using relevant emojis.
+   - For Tech/Gadgets: e.g. 🔥 *Trending Tech Deal Alert!* 📱, ⚡ *Budget Gadget Offer!* 🎧, 🚀 *Must-Have Tech Deal!* ⌚
+   - For Beauty/Personal Care: e.g. ✨ *Self-Care & Beauty Pick!* 💄, 🌸 *Super Saver Beauty Pack!* 🧴
+   - For Kitchen/Home: e.g. 🏠 *Home & Kitchen Essential!* 🍳, 💡 *Smart Home Deal!* ✨
+   - For Fashion/Lifestyle: e.g. 👟 *Trending Fashion Steal!* 👗, 🎒 *Style on a Budget!* 🕶️
+   - For Huge Discounts (40%+): e.g. 💥 *Crazy Price Drop Alert!* 🔥, 🚨 *Loot Offer - Huge Savings!* 🛍️
+   - For Everyday Essentials: e.g. 🛒 *Daily Essential Value Deal!* 📦, ⭐ *Today's Hot Pick!* 🎉
+
+2. NATURAL CONVERSATIONAL TONE (SINHALA + CASUAL ENGLISH / SINGLISH):
+   - Use natural, friendly Sinhala mixed with standard everyday English shopping terms (Singlish).
+   - DO NOT awkwardly translate common terms into ancient/formal Sinhala! Keep terms like:
+     "Super Quality", "Trending Item", "Value Pack", "Battery Life", "Long-lasting", "Cash on Delivery (COD) Available", "Best Seller", "Island-wide Fast Delivery", "Easy to use", "Gift Idea".
+   - Keep the tone exciting, friendly, and persuasive—like an experienced deal finder recommending a great buy to friends on WhatsApp.
+
+3. PRICING & SAVINGS SECTION:
+   - Clear, clean pricing breakdown:
+     ❌ සාමාන්‍ය මිල: Rs. ${input.originalPrice || '---'}
+     ✅ *අද විශේෂ Offer මිල:* *Rs. ${input.discountPrice || '---'}*
+     🔥 *වට්ටම:* ${input.discountPercentage ? `${input.discountPercentage}% OFF` : 'Mega Savings!'}
+
+4. KEY HIGHLIGHTS:
+   - 2 to 3 crisp, appealing bullet points in Sinhala explaining WHY this product is worth buying.
+
+5. CLEAR CALL TO ACTION (CTA):
+   👉 *දැන්ම Order කිරීමට මෙතන Click කරන්න:*
+   ${input.affiliateRedirectUrl}
+
+6. COMMUNITY INVITE & URGENCY FOOTER:
+   ⚠️ *Limited Stock! Offer එක ඉවර වෙන්න කලින් ඉක්මන් කරන්න!*
+   ${input.communityInviteUrl ? `\n📲 *මෙවැනිම සුපිරි Offers සහ Deals දිනපතා ලබාගැනීමට අපගේ WhatsApp සමූහයට එක්වන්න:*\n👉 ${input.communityInviteUrl}` : ''}
+
+7. FORMATTING:
+   - Use WhatsApp markdown (*bold*, _italics_).
+   - Keep line spacing clean and pleasant to read on mobile screens.
+   - NEVER alter, break, or remove the exact Tracking Link.
+
+Return ONLY the final WhatsApp message text. Do not wrap in markdown code fences or backticks.`;
+
+    try {
+      const response = await this.ai.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config: {
+          temperature: 0.65,
+        },
+      });
+
+      return response.text?.trim() || this.formatDarazSinhalaFallback(input);
+    } catch (err: any) {
+      console.error('[CopywritingService] Error calling Gemini for Daraz Sinhala copywriting:', err.message);
+      return this.formatDarazSinhalaFallback(input);
+    }
+  }
+
+  /**
+   * Generates both Tamil and Sinhala promotional copies in parallel.
+   */
+  async generateBilingualDarazDeals(
+    input: DarazCopywritingInput
+  ): Promise<{ tamilText: string; sinhalaText: string }> {
+    const [tamilText, sinhalaText] = await Promise.all([
+      this.formatDarazDealForWhatsApp(input),
+      this.formatDarazDealSinhalaForWhatsApp(input),
+    ]);
+    return { tamilText, sinhalaText };
+  }
+
   // Fallback templates when Gemini API key is not present
   private formatNewsFallback(input: NewsCopywritingInput): string {
     const title = input.title || 'முக்கிய செய்தி';
@@ -184,6 +273,26 @@ ${input.discountPercentage ? `🔥 *தள்ளுபடி: ${input.discountPe
 ${input.communityInviteUrl ? `\n📲 *மேலும் அதிரடி தள்ளுபடி சலுகைகளை உடனுக்குடன் பெற எமது WhatsApp குழுவில் இணையுங்கள்:*\n👉 ${input.communityInviteUrl}` : ''}
 
 ⚠️ _வரையறுக்கப்பட்ட ஸ்டொக் மட்டுமே! சலுகை முடிவதற்குள் முந்துங்கள்!_`;
+  }
+
+  private formatDarazSinhalaFallback(input: DarazCopywritingInput): string {
+    return `⚡ *විශේෂ මිල අඩුකිරීමක්!* ⚡
+
+*${input.title}*
+
+${input.originalPrice ? `❌ සාමාන්‍ය මිල: ~Rs. ${input.originalPrice}~` : ''}
+${input.discountPrice ? `✅ *අද විශේෂ Offer මිල: Rs. ${input.discountPrice}*` : ''}
+${input.discountPercentage ? `🔥 *වට්ටම: ${input.discountPercentage}% OFF*` : ''}
+
+📌 *විශේෂාංග:*
+✔ 100% Original Brand New Product
+✔ Island-wide Delivery & Cash on Delivery (COD) පහසුකම සහිතයි
+
+👉 *දැන්ම Order කිරීමට මෙතන Click කරන්න:*
+🔗 ${input.affiliateRedirectUrl}
+${input.communityInviteUrl ? `\n📲 *තවත් මෙවැනි විශේෂ Offer විස්තර உடனுக்குடன் ලබාගැනීමට අපගේ WhatsApp Group එකට එකතු වන්න:*\n👉 ${input.communityInviteUrl}` : ''}
+
+⚠️ _සීමිත තොග ප්‍රමාණයක් පමණි! අවස්ථාව මගනොහරින්න!_`;
   }
 }
 

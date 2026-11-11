@@ -1,5 +1,6 @@
 export type GroupRole = 'SOURCE' | 'DESTINATION' | 'NONE';
 export type ChannelType = 'NEWS' | 'DARAZ';
+export type GroupLanguage = 'TAMIL' | 'SINHALA' | 'ALL';
 export type PostStatus =
   | 'PENDING'
   | 'PENDING_APPROVAL'
@@ -15,6 +16,7 @@ export interface WhatsAppGroup {
   name: string;
   role: GroupRole;
   type: ChannelType;
+  language: GroupLanguage;
   isActive: boolean;
   createdAt: string;
 }
@@ -52,6 +54,7 @@ export interface DealPost {
   type: ChannelType;
   rawPayload: any;
   processedText: string | null;
+  processedTextSinhala?: string | null;
   mediaUrl: string | null;
   status: PostStatus;
   sentAt: string | null;

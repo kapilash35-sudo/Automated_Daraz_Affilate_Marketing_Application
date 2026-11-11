@@ -37,12 +37,13 @@ export function createDarazWorker() {
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
       const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${postId}`;
 
-      // 3. Resolve Ad Promotional Copy:
-      let formattedText = post.processedText;
+      // 3. Resolve Ad Promotional Copies (Tamil & Sinhala):
+      let formattedTextTamil = post.processedText;
+      let formattedTextSinhala = post.processedTextSinhala || (payload?.processedTextSinhala as string);
 
-      if (!formattedText || !formattedText.trim()) {
-        console.log(`[DarazWorker] Generating fresh Tamil Flash Deal promotional copy with Gemini...`);
-        formattedText = await copywritingService.formatDarazDealForWhatsApp({
+      if (!formattedTextTamil || !formattedTextTamil.trim() || !formattedTextSinhala || !formattedTextSinhala.trim()) {
+        console.log(`[DarazWorker] Generating fresh Bilingual (Tamil + Sinhala) Flash Deal copy with Gemini...`);
+        const bilingual = await copywritingService.generateBilingualDarazDeals({
           title: payload.title || 'சிறப்பு தள்ளுபடி தயாரிப்பு',
           originalPrice: payload.originalPrice,
           discountPrice: payload.discountPrice || payload.price,
@@ -52,19 +53,25 @@ export function createDarazWorker() {
           category: payload.category,
           communityInviteUrl: communityInviteUrl || undefined,
         });
-      } else {
-        // Ensure the tracking redirect link is present (replace localhost:4000 or raw direct affiliate link if present)
-        if (formattedText.includes('localhost:4000/r/')) {
-          formattedText = formattedText.replace(/https?:\/\/localhost:4000\/r\/[^\s]+/g, trackingUrl);
-        }
-        if (directAffiliateUrl && formattedText.includes(directAffiliateUrl)) {
-          formattedText = formattedText.replace(directAffiliateUrl, trackingUrl);
-        }
-        // Ensure community group invite link is present in footer
-        if (communityInviteUrl && !formattedText.includes(communityInviteUrl)) {
-          formattedText += `\n\n📲 *மேலும் அதிரடி தள்ளுபடி சலுகைகளை உடனுக்குடன் பெற எமது WhatsApp குழுவில் இணையுங்கள்:*\n👉 ${communityInviteUrl}`;
-        }
+
+        if (!formattedTextTamil || !formattedTextTamil.trim()) formattedTextTamil = bilingual.tamilText;
+        if (!formattedTextSinhala || !formattedTextSinhala.trim()) formattedTextSinhala = bilingual.sinhalaText;
       }
+
+      // Helper to sanitize links in copy:
+      const sanitizeCopy = (text: string) => {
+        let t = text;
+        if (t.includes('localhost:4000/r/')) {
+          t = t.replace(/https?:\/\/localhost:4000\/r\/[^\s]+/g, trackingUrl);
+        }
+        if (directAffiliateUrl && t.includes(directAffiliateUrl)) {
+          t = t.replace(directAffiliateUrl, trackingUrl);
+        }
+        return t;
+      };
+
+      formattedTextTamil = sanitizeCopy(formattedTextTamil);
+      formattedTextSinhala = sanitizeCopy(formattedTextSinhala);
 
       // 4. Find Active Destination Groups for DARAZ
       const destinationGroups = await prisma.group.findMany({
@@ -80,7 +87,8 @@ export function createDarazWorker() {
         await prisma.post.update({
           where: { id: postId },
           data: {
-            processedText: formattedText,
+            processedText: formattedTextTamil,
+            processedTextSinhala: formattedTextSinhala,
             duplicateReason: 'No active DESTINATION groups found for DARAZ.',
           },
         });
@@ -94,7 +102,16 @@ export function createDarazWorker() {
       for (let i = 0; i < destinationGroups.length; i++) {
         const dest = destinationGroups[i];
         primaryGroupId = dest.id;
-        console.log(`[DarazWorker] Dispatching Daraz deal to group ${dest.name} (${dest.wahaChatId}) [${i + 1}/${destinationGroups.length}]`);
+
+        // Choose text based on group's configured language
+        let groupText = formattedTextTamil;
+        if (dest.language === 'SINHALA') {
+          groupText = formattedTextSinhala;
+        } else if (dest.language === 'ALL') {
+          groupText = `${formattedTextTamil}\n\n━━━━━━━━━━━━━━━\n\n${formattedTextSinhala}`;
+        }
+
+        console.log(`[DarazWorker] Dispatching Daraz deal [Lang: ${dest.language}] to group ${dest.name} (${dest.wahaChatId}) [${i + 1}/${destinationGroups.length}]`);
 
         try {
           let dispatchResponse;
@@ -102,14 +119,14 @@ export function createDarazWorker() {
             dispatchResponse = await wahaClient.sendFileMessage(
               dest.wahaChatId,
               post.mediaUrl,
-              formattedText,
+              groupText,
               'product.jpg',
               'image/jpeg'
             );
           } else {
             dispatchResponse = await wahaClient.sendTextMessage(
               dest.wahaChatId,
-              formattedText
+              groupText
             );
           }
 
@@ -135,7 +152,8 @@ export function createDarazWorker() {
         where: { id: postId },
         data: {
           status: 'SENT',
-          processedText: formattedText,
+          processedText: formattedTextTamil,
+          processedTextSinhala: formattedTextSinhala,
           sentAt: new Date(),
           destinationGroupId: primaryGroupId,
           wahaMessageId: lastWahaMessageId ? String(lastWahaMessageId) : null,

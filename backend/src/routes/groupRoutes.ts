@@ -8,6 +8,7 @@ const groupCreateSchema = z.object({
   name: z.string().min(1),
   role: z.enum(['SOURCE', 'DESTINATION', 'NONE']).default('NONE'),
   type: z.enum(['NEWS', 'DARAZ']).default('NEWS'),
+  language: z.enum(['TAMIL', 'SINHALA', 'ALL']).default('TAMIL'),
   isActive: z.boolean().default(true),
 });
 
@@ -15,6 +16,7 @@ const groupUpdateSchema = z.object({
   name: z.string().optional(),
   role: z.enum(['SOURCE', 'DESTINATION', 'NONE']).optional(),
   type: z.enum(['NEWS', 'DARAZ']).optional(),
+  language: z.enum(['TAMIL', 'SINHALA', 'ALL']).optional(),
   isActive: z.boolean().optional(),
 });
 
@@ -128,12 +130,16 @@ export const groupRoutes: FastifyPluginAsync = async (fastify) => {
           });
 
           if (!existing) {
+            const groupName = chat.name || `WhatsApp Group (${chatId.slice(0, 12)})`;
+            const isSinhala = /[\u0D80-\u0DFF]/i.test(groupName) || /sinhala/i.test(groupName);
+
             await prisma.group.create({
               data: {
                 wahaChatId: chatId,
-                name: chat.name || `WhatsApp Group (${chatId.slice(0, 12)})`,
+                name: groupName,
                 role: 'NONE',
                 type: 'DARAZ',
+                language: isSinhala ? 'SINHALA' : 'TAMIL',
                 isActive: true,
               },
             });

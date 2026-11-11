@@ -106,7 +106,7 @@ export async function fetchGroups(): Promise<WhatsAppGroup[]> {
 
 export async function updateGroup(
   id: string,
-  data: Partial<Pick<WhatsAppGroup, 'name' | 'role' | 'type' | 'isActive'>>
+  data: Partial<Pick<WhatsAppGroup, 'name' | 'role' | 'type' | 'language' | 'isActive'>>
 ): Promise<WhatsAppGroup> {
   const res = await fetch(`${API_BASE}/api/groups/${id}`, {
     method: 'PATCH',

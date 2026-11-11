@@ -46,7 +46,7 @@ export default function CreateDealPage() {
     <div className="space-y-8 max-w-3xl mx-auto">
       <Header
         title="Quick Deal Creator"
-        subtitle="Generate WhatsApp promotional ads with Gemini 3.0"
+        subtitle="Generate bilingual (Tamil & Sinhala) WhatsApp promotional ads with Gemini"
       />
 
       {successMessage && (

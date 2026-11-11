@@ -18,6 +18,12 @@ enum ChannelType {
   DARAZ
 }
 
+enum GroupLanguage {
+  TAMIL
+  SINHALA
+  ALL
+}
+
 enum PostStatus {
   PENDING
   PENDING_APPROVAL
@@ -40,30 +46,32 @@ model SystemSetting {
 }
 
 model Group {
-  id         String      @id @default(cuid())
-  wahaChatId String      @unique
+  id         String        @id @default(cuid())
+  wahaChatId String        @unique
   name       String
-  role       GroupRole   @default(NONE)
-  type       ChannelType @default(DARAZ)
-  isActive   Boolean     @default(true)
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
+  role       GroupRole     @default(NONE)
+  type       ChannelType   @default(DARAZ)
+  language   GroupLanguage @default(TAMIL)
+  isActive   Boolean       @default(true)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   destinationPosts Post[] @relation("DestinationGroupPosts")
 
-  @@index([role, type, isActive])
+  @@index([role, type, language, isActive])
 }
 
 model Post {
-  id                 String         @id @default(cuid())
-  sourceRef          String?
-  destinationGroupId String?
-  destinationGroup   Group?         @relation("DestinationGroupPosts", fields: [destinationGroupId], references: [id], onDelete: SetNull)
-  type               ChannelType    @default(DARAZ)
-  rawPayload         Json
-  processedText      String?        @db.Text
-  mediaUrl           String?
-  status             PostStatus     @default(PENDING_APPROVAL)
+  id                   String         @id @default(cuid())
+  sourceRef            String?
+  destinationGroupId   String?
+  destinationGroup     Group?         @relation("DestinationGroupPosts", fields: [destinationGroupId], references: [id], onDelete: SetNull)
+  type                 ChannelType    @default(DARAZ)
+  rawPayload           Json
+  processedText        String?        @db.Text
+  processedTextSinhala String?        @db.Text
+  mediaUrl             String?
+  status               PostStatus     @default(PENDING_APPROVAL)
   duplicateReason    String?
   wahaMessageId      String?        @unique
   pollMessageId      String?        @unique

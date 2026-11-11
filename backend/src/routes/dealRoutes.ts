@@ -139,13 +139,14 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
           status: parsed.autoApprove ? 'PROCESSING' : 'PENDING_APPROVAL',
           rawPayload: dealData as any,
           processedText: '',
+          processedTextSinhala: '',
         },
       });
 
       const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
 
-      // AI Copywriting with Gemini using tracking URL
-      const formattedAd = await copywritingService.formatDarazDealForWhatsApp({
+      // AI Copywriting with Gemini: generate both Tamil and Sinhala in parallel
+      const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
         title: dealData.title,
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
@@ -156,7 +157,10 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
 
       await prisma.post.update({
         where: { id: post.id },
-        data: { processedText: formattedAd },
+        data: {
+          processedText: tamilText,
+          processedTextSinhala: sinhalaText,
+        },
       });
 
       if (parsed.autoApprove) {
@@ -172,10 +176,13 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
           const activeGroups = await prisma.group.findMany({
             where: { role: 'DESTINATION', type: 'DARAZ', isActive: true },
           });
+          const tamilCount = activeGroups.filter((g) => g.language === 'TAMIL' || g.language === 'ALL').length;
+          const sinhalaCount = activeGroups.filter((g) => g.language === 'SINHALA' || g.language === 'ALL').length;
+
           const commInfo = dealData.commissionAmount
             ? `\n\n💰 *உண்மையான கமிஷன்:* Rs. ${dealData.commissionAmount} / order`
             : '';
-          const preview = `📢 *Dashboard-ல் புதிய விளம்பரம் உருவாக்கப்பட்டது!*\n\n${formattedAd}${commInfo}`;
+          const preview = `📢 *Dashboard-ல் புதிய விளம்பரம் உருவாக்கப்பட்டது!*\n\n👥 *குரூப்கள்:* ${tamilCount} தமிழ் | ${sinhalaCount} சிங்களம்${commInfo}\n\n🇱🇰 *[தமிழ்]:*\n${tamilText}\n\n🇱🇰 *[සිංහල]:*\n${sinhalaText}`;
           if (dealData.mediaUrl) {
             await wahaClient.sendFileMessage(adminChatId, dealData.mediaUrl, preview);
           } else {
@@ -197,7 +204,8 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         preview: {
           title: dealData.title,
           image: dealData.mediaUrl,
-          copy: formattedAd,
+          copy: tamilText,
+          copySinhala: sinhalaText,
         },
       });
     } catch (err: any) {

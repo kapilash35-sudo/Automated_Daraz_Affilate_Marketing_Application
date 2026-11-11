@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { WhatsAppGroup, GroupRole, ChannelType } from '../lib/types';
+import { WhatsAppGroup, GroupRole, ChannelType, GroupLanguage } from '../lib/types';
 import { updateGroup, syncWahaGroups } from '../lib/api';
-import { Users, RefreshCw, Check, Power } from 'lucide-react';
+import { Users, RefreshCw, Check, Power, Globe } from 'lucide-react';
 
 interface GroupManagementTableProps {
   initialGroups: WhatsAppGroup[];
@@ -36,6 +36,19 @@ export function GroupManagementTable({ initialGroups }: GroupManagementTableProp
       showToast(`Channel type set to ${newType}`);
     } catch (err: any) {
       alert(`Failed to update channel type: ${err.message}`);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleLanguageChange = async (group: WhatsAppGroup, newLang: GroupLanguage) => {
+    setUpdatingId(group.id);
+    try {
+      const updated = await updateGroup(group.id, { language: newLang });
+      setGroups((prev) => prev.map((g) => (g.id === group.id ? updated : g)));
+      showToast(`Group language set to ${newLang}`);
+    } catch (err: any) {
+      alert(`Failed to update group language: ${err.message}`);
     } finally {
       setUpdatingId(null);
     }
@@ -111,6 +124,7 @@ export function GroupManagementTable({ initialGroups }: GroupManagementTableProp
               <th className="pb-3 font-semibold">Group Name & Chat ID</th>
               <th className="pb-3 font-semibold text-center">Assigned Role</th>
               <th className="pb-3 font-semibold text-center">Pipeline Domain</th>
+              <th className="pb-3 font-semibold text-center">Language</th>
               <th className="pb-3 font-semibold text-center">Active Status</th>
               <th className="pb-3 font-semibold text-right">Routing Status</th>
             </tr>
@@ -160,6 +174,20 @@ export function GroupManagementTable({ initialGroups }: GroupManagementTableProp
                   >
                     <option value="NEWS">NEWS (Media)</option>
                     <option value="DARAZ">DARAZ (Affiliate)</option>
+                  </select>
+                </td>
+
+                {/* Target Language */}
+                <td className="py-3.5 text-center">
+                  <select
+                    value={group.language || 'TAMIL'}
+                    disabled={updatingId === group.id}
+                    onChange={(e) => handleLanguageChange(group, e.target.value as GroupLanguage)}
+                    className="bg-white border border-slate-200 text-xs rounded-xl px-2.5 py-1.5 text-slate-800 font-semibold focus:outline-none focus:border-emerald-500 shadow-sm"
+                  >
+                    <option value="TAMIL">🇱🇰 தமிழ் (Tamil)</option>
+                    <option value="SINHALA">🇱🇰 සිංහල (Sinhala)</option>
+                    <option value="ALL">🌐 All (இருமொழியும்)</option>
                   </select>
                 </td>
 

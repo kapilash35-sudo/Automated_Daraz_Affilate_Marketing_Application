@@ -24,6 +24,7 @@ export default function DealsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [isWhatsAppConnected, setIsWhatsAppConnected] = useState(false);
+  const [selectedLangMap, setSelectedLangMap] = useState<Record<string, 'TAMIL' | 'SINHALA'>>({});
   const [toast, setToast] = useState<string | null>(null);
 
   const loadData = async () => {
@@ -195,9 +196,42 @@ export default function DealsPage() {
                       </div>
                     </div>
 
+                    {/* Bilingual Language Switcher */}
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLangMap((prev) => ({ ...prev, [deal.id]: 'TAMIL' }))}
+                          className={`px-2.5 py-1 rounded font-bold text-[11px] transition-all ${
+                            (selectedLangMap[deal.id] || 'TAMIL') === 'TAMIL'
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          🇱🇰 தமிழ்
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedLangMap((prev) => ({ ...prev, [deal.id]: 'SINHALA' }))}
+                          className={`px-2.5 py-1 rounded font-bold text-[11px] transition-all ${
+                            selectedLangMap[deal.id] === 'SINHALA'
+                              ? 'bg-emerald-600 text-white shadow-sm'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          🇱🇰 සිංහල
+                        </button>
+                      </div>
+                      <span className="text-[10px] font-mono text-slate-400">
+                        {(selectedLangMap[deal.id] || 'TAMIL') === 'TAMIL' ? 'Tamil Copy Preview' : 'Sinhala Copy Preview'}
+                      </span>
+                    </div>
+
                     {/* AI Generated WhatsApp Copy Box */}
                     <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 text-xs text-slate-800 font-mono whitespace-pre-wrap leading-relaxed max-h-52 overflow-y-auto">
-                      {deal.processedText}
+                      {selectedLangMap[deal.id] === 'SINHALA'
+                        ? deal.processedTextSinhala || 'සිංහල දැන්වීමක් නොමැත (Only Tamil available)'
+                        : deal.processedText}
                     </div>
                   </div>
 
