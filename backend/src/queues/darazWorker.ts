@@ -3,6 +3,7 @@ import { redisConnection } from '../config/redis.js';
 import { prisma } from '../config/prisma.js';
 import { env } from '../config/env.js';
 import { copywritingService } from '../services/copywritingService.js';
+import { posterService } from '../services/posterService.js';
 import { wahaClient } from '../services/wahaClient.js';
 import { SettingsService } from '../services/settingsService.js';
 import { DarazJobData } from './queueManager.js';
@@ -74,6 +75,33 @@ export function createDarazWorker() {
 
       formattedTextTamil = sanitizeCopy(formattedTextTamil);
       formattedTextSinhala = sanitizeCopy(formattedTextSinhala);
+
+      // Ensure post has custom branded deal poster
+      if (post.mediaUrl && !post.mediaUrl.includes('deal-poster')) {
+        try {
+          const generatedPoster = await posterService.createAndUploadPoster({
+            title: payload.title || 'சிறப்பு தள்ளுபடி தயாரிப்பு',
+            originalPrice: payload.originalPrice,
+            discountPrice: payload.discountPrice || payload.price,
+            discountPercentage: payload.discountPercentage,
+            mediaUrl: post.mediaUrl,
+            features: [
+              payload.productDetails || '100% Original Brand Guarantee',
+              'Island-wide Fast Express Delivery',
+              'Cash on Delivery (COD) Available',
+            ],
+          });
+          if (generatedPoster) {
+            post.mediaUrl = generatedPoster;
+            await prisma.post.update({
+              where: { id: post.id },
+              data: { mediaUrl: generatedPoster },
+            });
+          }
+        } catch (posterErr: any) {
+          console.warn('[DarazWorker] Custom poster generation fallback:', posterErr.message);
+        }
+      }
 
       // 4. Find Active Destination Groups for DARAZ
       const destinationGroups = await prisma.group.findMany({

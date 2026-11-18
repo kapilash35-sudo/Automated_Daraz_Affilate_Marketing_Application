@@ -3,7 +3,7 @@ FROM node:22-alpine AS builder
 WORKDIR /app
 
 # Install system dependencies
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl fontconfig ttf-dejavu
 
 # Install npm packages
 COPY package*.json ./
@@ -22,7 +22,7 @@ FROM node:22-alpine AS runner
 
 WORKDIR /app
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl fontconfig ttf-dejavu
 
 ENV NODE_ENV=production
 

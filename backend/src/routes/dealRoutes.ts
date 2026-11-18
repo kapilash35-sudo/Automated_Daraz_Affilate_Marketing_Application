@@ -4,6 +4,7 @@ import { prisma } from '../config/prisma.js';
 import { env } from '../config/env.js';
 import { DarazExtractor } from '../services/darazExtractor.js';
 import { copywritingService } from '../services/copywritingService.js';
+import { posterService } from '../services/posterService.js';
 import { SettingsService } from '../services/settingsService.js';
 import { addDarazJob } from '../queues/queueManager.js';
 import { wahaMediaService } from '../services/wahaMediaService.js';
@@ -131,12 +132,34 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
       const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
+      // Generate Custom Branded Deal Poster
+      let finalMediaUrl = dealData.mediaUrl || null;
+      try {
+        const generatedPosterUrl = await posterService.createAndUploadPoster({
+          title: dealData.title,
+          originalPrice: dealData.originalPrice,
+          discountPrice: dealData.discountPrice || dealData.originalPrice || '0',
+          discountPercentage: dealData.discountPercentage,
+          mediaUrl: finalMediaUrl,
+          features: [
+            '100% Original Brand Guarantee',
+            'Island-wide Fast Express Delivery',
+            'Cash on Delivery (COD) Available',
+          ],
+        });
+        if (generatedPosterUrl) {
+          finalMediaUrl = generatedPosterUrl;
+        }
+      } catch (posterErr: any) {
+        console.warn('[DealRoutes] Custom poster generation fallback to raw image:', posterErr.message);
+      }
+
       // Create post first to acquire unique postId
       const post = await prisma.post.create({
         data: {
           type: 'DARAZ',
           sourceRef: dealData.exactAffiliateUrl,
-          mediaUrl: dealData.mediaUrl,
+          mediaUrl: finalMediaUrl,
           status: parsed.autoApprove ? 'PROCESSING' : 'PENDING_APPROVAL',
           rawPayload: dealData as any,
           processedText: '',

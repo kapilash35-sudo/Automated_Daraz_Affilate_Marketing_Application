@@ -6,6 +6,7 @@ import { wahaMediaService } from './wahaMediaService.js';
 import { DarazExtractor } from './darazExtractor.js';
 import { copywritingService } from './copywritingService.js';
 import { SettingsService } from './settingsService.js';
+import { posterService } from './posterService.js';
 import { addDarazJob } from '../queues/queueManager.js';
 
 export interface AdminConversationState {
@@ -551,7 +552,27 @@ export class AdminChatService {
       const sinhalaCount = destinationGroups.filter((g) => g.language === 'SINHALA' || g.language === 'ALL').length;
 
       // Save Post as PENDING_APPROVAL in database first to get unique postId
-      const finalMediaUrl = (dealData.mediaUrl && dealData.mediaUrl !== 'NONE') ? dealData.mediaUrl : null;
+      let finalMediaUrl = (dealData.mediaUrl && dealData.mediaUrl !== 'NONE') ? dealData.mediaUrl : null;
+      try {
+        const generatedPosterUrl = await posterService.createAndUploadPoster({
+          title: dealData.title,
+          originalPrice: dealData.originalPrice,
+          discountPrice: dealData.discountPrice,
+          discountPercentage: dealData.discountPercentage,
+          mediaUrl: finalMediaUrl,
+          features: [
+            dealData.productDetails || '100% Original Brand Guarantee',
+            'Island-wide Fast Express Delivery',
+            'Cash on Delivery (COD) Available',
+          ],
+        });
+        if (generatedPosterUrl) {
+          finalMediaUrl = generatedPosterUrl;
+        }
+      } catch (posterErr: any) {
+        console.warn('[AdminChatService] Custom poster generation fallback to raw image:', posterErr.message);
+      }
+
       const post = await prisma.post.create({
         data: {
           type: 'DARAZ',

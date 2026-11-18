@@ -119,6 +119,34 @@ export class WahaMediaService {
     console.log(`[WahaMediaService] Uploaded media to MinIO: ${publicUrl}`);
     return publicUrl;
   }
+
+  /**
+   * Uploads an in-memory buffer directly to MinIO and returns the permanent public URL.
+   */
+  async uploadBuffer(
+    buffer: Buffer,
+    contentType: string = 'image/jpeg',
+    filenamePrefix: string = 'poster'
+  ): Promise<string> {
+    await this.ensureBucketExists();
+    const uniqueId = crypto.randomUUID();
+    const datePrefix = new Date().toISOString().slice(0, 10);
+    const extension = contentType.includes('png') ? '.png' : '.jpg';
+    const objectKey = `posters/${datePrefix}/${filenamePrefix}-${uniqueId}${extension}`;
+
+    await s3Client.send(
+      new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+        Body: buffer,
+        ContentType: contentType,
+      })
+    );
+
+    const publicUrl = `${env.MINIO_PUBLIC_URL}/${objectKey}`;
+    console.log(`[WahaMediaService] Uploaded custom poster to MinIO: ${publicUrl}`);
+    return publicUrl;
+  }
 }
 
 export const wahaMediaService = new WahaMediaService();
