@@ -3,8 +3,11 @@ import './globals.css';
 import { Sidebar } from '../components/Sidebar';
 
 export const metadata: Metadata = {
-  title: 'WhatsApp Media & Affiliate Marketing Engine',
-  description: 'Dual-Source Ingestion, AI Deduplication & Deep Analytics Dashboard',
+  title: 'KH Daraz Deals - Affiliate Marketing & Command Hub',
+  description: 'Automated Daraz Flash Deals, Custom Graphic Flyers & Multilingual Broadcast Hub',
+  icons: {
+    icon: '/kh-logo.png',
+  },
 };
 
 export default function RootLayout({

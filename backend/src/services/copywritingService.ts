@@ -298,6 +298,58 @@ ${sinhalaCommunityUrl ? `\n📲 *තවත් මෙවැනි විශේෂ
 
 ⚠️ _සීමිත තොග ප්‍රමාණයක් පමණි! අවස්ථාව මගනොහරින්න!_`;
   }
+
+  /**
+   * Hybrid AI Highlight Extractor:
+   * Uses Gemini AI to extract a crisp 2-line title and top 4 selling points in English
+   * specifically formatted for the graphic flyer.
+   */
+  async extractPosterHighlights(
+    rawTitle: string,
+    rawDetails?: string
+  ): Promise<{ shortTitle: string; bullets: string[] } | null> {
+    if (!this.ai) return null;
+
+    try {
+      const prompt = `You are an expert e-commerce creative director for Daraz deal posters.
+Given this Daraz product:
+TITLE: ${rawTitle}
+DETAILS: ${rawDetails || ''}
+
+Extract:
+1. SHORT_TITLE: A clean, punchy brand + product name in English (max 2 lines, around 20-30 characters per line, e.g. "AirPods Pro 2nd Gen Wireless Earbuds"). Do not include price, discounts, or spam words.
+2. BULLETS: Exactly 4 punchy, high-converting feature highlights in English (e.g. "Active Noise Cancellation", "Up to 30h Battery Life", "Fast USB-C Charging", "100% Genuine Brand"). Each bullet must be 3 to 6 words maximum.
+
+Respond in exact JSON format only:
+{
+  "shortTitle": "Product Name",
+  "bullets": ["Point 1", "Point 2", "Point 3", "Point 4"]
+}`;
+
+      const response = await this.ai.models.generateContent({
+        model: this.model,
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+        },
+      });
+
+      const jsonStr = response.text?.trim();
+      if (!jsonStr) return null;
+      const parsed = JSON.parse(jsonStr);
+      if (parsed && parsed.shortTitle && Array.isArray(parsed.bullets) && parsed.bullets.length >= 3) {
+        return {
+          shortTitle: parsed.shortTitle,
+          bullets: parsed.bullets.slice(0, 4),
+        };
+      }
+      return null;
+    } catch (err: any) {
+      console.warn('[CopywritingService] Gemini poster highlight extraction failed, using heuristic fallback:', err.message);
+      return null;
+    }
+  }
 }
 
 export const copywritingService = new CopywritingService();

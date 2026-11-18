@@ -31,6 +31,9 @@ COPY prisma ./prisma/
 
 RUN npm install --omit=dev
 
+COPY assets ./assets/
+RUN mkdir -p /usr/share/fonts/truetype/custom && cp assets/fonts/*.ttf /usr/share/fonts/truetype/custom/ 2>/dev/null || true && fc-cache -f
+
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder /app/dist ./dist

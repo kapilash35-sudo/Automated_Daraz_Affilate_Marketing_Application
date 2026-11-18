@@ -1,7 +1,10 @@
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import sharp from 'sharp';
 import { wahaMediaService } from './wahaMediaService.js';
 import { SettingsService } from './settingsService.js';
+import { copywritingService } from './copywritingService.js';
 
 export interface PosterInput {
   title: string;
@@ -16,6 +19,66 @@ export interface PosterInput {
 }
 
 export class PosterService {
+  private khLogoBase64: string | null = null;
+  private darazLogoBase64: string | null = null;
+  private waLogoBase64: string | null = null;
+  private fontBase64: string | null = null;
+
+  constructor() {
+    this.loadBrandingAssets();
+  }
+
+  /**
+   * Pre-loads branding logos and Montserrat font into memory for lightning-fast flyer rendering.
+   */
+  private loadBrandingAssets(): void {
+    try {
+      const rootDir = process.cwd();
+
+      // 1. KH Official Circular Logo Badge
+      const khPath = path.resolve(rootDir, 'assets/branding/kh_badge_160.png');
+      const khAltPath = path.resolve(rootDir, 'assets/branding/kh_logo_circle.png');
+      if (fs.existsSync(khPath)) {
+        this.khLogoBase64 = fs.readFileSync(khPath).toString('base64');
+      } else if (fs.existsSync(khAltPath)) {
+        this.khLogoBase64 = fs.readFileSync(khAltPath).toString('base64');
+      }
+
+      // 2. Official Orange Daraz Logo Badge
+      const darazPath = path.resolve(rootDir, 'assets/branding/daraz_badge_120.png');
+      const darazAltPath = path.resolve(rootDir, 'assets/branding/daraz_logo.png');
+      if (fs.existsSync(darazPath)) {
+        this.darazLogoBase64 = fs.readFileSync(darazPath).toString('base64');
+      } else if (fs.existsSync(darazAltPath)) {
+        this.darazLogoBase64 = fs.readFileSync(darazAltPath).toString('base64');
+      }
+
+      // 3. Official WhatsApp Logo Badge
+      const waPath = path.resolve(rootDir, 'assets/branding/wa_badge_120.png');
+      const waAltPath = path.resolve(rootDir, 'assets/branding/whatsapp_logo.png');
+      if (fs.existsSync(waPath)) {
+        this.waLogoBase64 = fs.readFileSync(waPath).toString('base64');
+      } else if (fs.existsSync(waAltPath)) {
+        this.waLogoBase64 = fs.readFileSync(waAltPath).toString('base64');
+      }
+
+      // 4. Montserrat ExtraBold Font
+      const fontPath = path.resolve(rootDir, 'assets/fonts/Montserrat-ExtraBold.ttf');
+      if (fs.existsSync(fontPath)) {
+        this.fontBase64 = fs.readFileSync(fontPath).toString('base64');
+      }
+
+      console.log('[PosterService] Branding assets loaded in memory:', {
+        hasKhLogo: !!this.khLogoBase64,
+        hasDarazLogo: !!this.darazLogoBase64,
+        hasWaLogo: !!this.waLogoBase64,
+        hasCustomFont: !!this.fontBase64,
+      });
+    } catch (err: any) {
+      console.warn('[PosterService] Asset loading notice:', err.message);
+    }
+  }
+
   /**
    * Escapes XML characters for safe SVG text embedding.
    */
@@ -32,7 +95,7 @@ export class PosterService {
   /**
    * Wraps long text into multiple lines of at most maxCharsPerLine.
    */
-  private wrapText(text: string, maxCharsPerLine: number = 30, maxLines: number = 2): string[] {
+  private wrapText(text: string, maxCharsPerLine: number = 28, maxLines: number = 2): string[] {
     const clean = text.replace(/[\r\n]+/g, ' ').trim();
     const words = clean.split(/\s+/);
     const lines: string[] = [];
@@ -149,11 +212,11 @@ export class PosterService {
         <rect width="200" height="220" rx="30" fill="#ffedd5" stroke="#f97316" stroke-width="4"/>
         <path d="M 60 70 Q 60 10 100 10 Q 140 10 140 70" stroke="#f97316" stroke-width="6" fill="none" stroke-linecap="round"/>
         <circle cx="100" cy="140" r="45" fill="#f97316"/>
-        <text x="100" y="152" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle">
+        <text x="100" y="152" font-family="'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="34" fill="#ffffff" text-anchor="middle">
           ★
         </text>
       </g>
-      <text x="210" y="340" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="20" fill="#64748b" text-anchor="middle">
+      <text x="210" y="340" font-family="'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="bold" font-size="20" fill="#64748b" text-anchor="middle">
         Daraz Verified Product
       </text>
     </svg>
@@ -169,13 +232,32 @@ export class PosterService {
   async generateSingleDealPoster(input: PosterInput): Promise<string> {
     const startTime = Date.now();
 
-    // 1. Resolve community branding & details
+    // 1. Resolve community branding
     const communityName =
       input.communityName || (await SettingsService.get('communityName', 'KH Daraz Deals & Updates'));
-    const titleLines = this.wrapText(input.title || 'Special Daraz Flash Deal', 30, 2);
+
+    // 2. Hybrid AI Step: Use Gemini AI to extract punchy 2-line title & top 4 selling points
+    let productTitle = input.title || 'Special Daraz Flash Deal';
+    let bullets = this.resolveBullets(input.productDetails, input.features);
+
+    try {
+      const aiExtraction = await copywritingService.extractPosterHighlights(input.title, input.productDetails);
+      if (aiExtraction) {
+        if (aiExtraction.shortTitle && aiExtraction.shortTitle.length > 5) {
+          productTitle = aiExtraction.shortTitle;
+        }
+        if (aiExtraction.bullets && aiExtraction.bullets.length >= 3) {
+          bullets = aiExtraction.bullets;
+        }
+        console.log(`[PosterService] Hybrid Gemini AI highlights applied: title="${productTitle}"`);
+      }
+    } catch (e: any) {
+      console.warn('[PosterService] Fallback to heuristic title/bullets:', e.message);
+    }
+
+    const titleLines = this.wrapText(productTitle, 28, 2);
     const origPriceFormatted = this.formatPrice(input.originalPrice);
     const discPriceFormatted = this.formatPrice(input.discountPrice) || 'Hot Offer!';
-    const bullets = this.resolveBullets(input.productDetails, input.features);
 
     let discountPercentage = input.discountPercentage;
     if (!discountPercentage && input.originalPrice && input.discountPrice) {
@@ -187,13 +269,38 @@ export class PosterService {
     }
     const discountBadgeText = discountPercentage ? `-${discountPercentage}%` : 'SUPER DEAL';
 
-    // 2. Fetch & prepare product image
+    // 3. Fetch & prepare product image
     const productBase64 = await this.fetchProductImageBase64(input.mediaUrl);
 
-    // 3. Construct 1080x1080 SVG Poster Canvas
+    // 4. Ensure branding assets are ready
+    if (!this.khLogoBase64 || !this.darazLogoBase64 || !this.waLogoBase64) {
+      this.loadBrandingAssets();
+    }
+
+    const khLogo = this.khLogoBase64;
+    const darazLogo = this.darazLogoBase64;
+    const waLogo = this.waLogoBase64;
+    const customFont = this.fontBase64;
+
+    // 5. Construct 1080x1080 SVG Poster Canvas
     const svg = `
     <svg width="1080" height="1080" viewBox="0 0 1080 1080" xmlns="http://www.w3.org/2000/svg">
       <defs>
+        ${
+          customFont
+            ? `
+        <style>
+          @font-face {
+            font-family: 'CustomMontserrat';
+            src: url('data:font/ttf;base64,${customFont}') format('truetype');
+            font-weight: 700 900;
+            font-style: normal;
+          }
+        </style>
+        `
+            : ''
+        }
+
         <!-- Background Gradients -->
         <linearGradient id="mainBg" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#190338"/>
@@ -258,7 +365,7 @@ export class PosterService {
       <circle cx="890" cy="85" r="4" fill="#ffffff" opacity="0.8"/>
 
       <!-- 2. Header: Megaphone Graphic (Left) -->
-      <g transform="translate(42, 32)">
+      <g transform="translate(42, 28)">
         <circle cx="48" cy="48" r="44" fill="url(#goldGradient)" filter="url(#ribbonShadow)"/>
         <circle cx="48" cy="48" r="38" fill="#ffffff"/>
         <g transform="translate(24, 25) scale(0.95)">
@@ -272,32 +379,55 @@ export class PosterService {
         </g>
       </g>
 
-      <!-- 3. Header: Community Name Badge (Top Center) -->
-      <g transform="translate(330, 18)">
-        <rect width="420" height="42" rx="21" fill="url(#goldGradient)" stroke="#ca8a04" stroke-width="2"/>
-        <circle cx="35" cy="21" r="6" fill="#1e1b4b"/>
-        <path d="M 23 33 Q 23 27 35 27 Q 47 27 47 33 Z" fill="#1e1b4b"/>
-        <text x="225" y="28" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="17" fill="#000000" text-anchor="middle" letter-spacing="0.5">
+      <!-- 3. Header: Community Name Badge with KH Brand Logo (Top Center) -->
+      <g transform="translate(280, 16)" filter="url(#pillShadow)">
+        <rect width="520" height="52" rx="26" fill="url(#goldGradient)" stroke="#ca8a04" stroke-width="2.5"/>
+        
+        <!-- Embedded User's KH Circular Logo Avatar -->
+        <g transform="translate(10, 6)">
+          <circle cx="20" cy="20" r="20" fill="#0f172a" stroke="#ca8a04" stroke-width="1.5"/>
+          ${
+            khLogo
+              ? `
+          <clipPath id="khAvatarClip">
+            <circle cx="20" cy="20" r="19"/>
+          </clipPath>
+          <image href="data:image/png;base64,${khLogo}" x="0" y="0" width="40" height="40" preserveAspectRatio="xMidYMid slice" clip-path="url(#khAvatarClip)"/>
+          `
+              : `
+          <text x="20" y="26" font-family="'CustomMontserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="14" fill="#facc15" text-anchor="middle">KH</text>
+          `
+          }
+        </g>
+        
+        <!-- Community Text in Reference Poster Font Style -->
+        <text x="280" y="34" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="20" fill="#000000" text-anchor="middle" letter-spacing="0.6">
           ${this.escapeXml(communityName)}
         </text>
       </g>
 
-      <!-- 4. Header: 3D Title Banner: Daraz Top Deals! -->
-      <g transform="translate(245, 75)" filter="url(#ribbonShadow)">
+      <!-- 4. Header: 3D Title Banner: Daraz Top Deals! with Real Daraz Logo -->
+      <g transform="translate(245, 76)" filter="url(#ribbonShadow)">
         <polygon points="0,52 -28,26 0,0" fill="#881337"/>
         <polygon points="590,52 618,26 590,0" fill="#881337"/>
         <rect x="0" y="0" width="590" height="78" rx="16" fill="url(#ribbonRed)" stroke="#facc15" stroke-width="3"/>
         
-        <!-- Daraz Logo Bag in Ribbon -->
+        <!-- Embedded Real Daraz Orange Logo in Ribbon -->
         <g transform="translate(20, 14)">
+          ${
+            darazLogo
+              ? `
+          <image href="data:image/png;base64,${darazLogo}" x="0" y="0" width="50" height="50" preserveAspectRatio="xMidYMid meet"/>
+          `
+              : `
           <rect width="50" height="50" rx="12" fill="#ffffff"/>
           <rect x="13" y="18" width="24" height="24" rx="4" fill="#ff6000"/>
-          <path d="M 19 18 Q 19 10 25 10 Q 31 10 31 18" stroke="#ffffff" stroke-width="2.5" fill="none"/>
-          <path d="M 21 28 L 29 28" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+          `
+          }
         </g>
         
         <!-- 3D Banner Title Text -->
-        <text x="330" y="55" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="46" fill="#fef08a" text-anchor="middle" stroke="#991b1b" stroke-width="2" letter-spacing="1">
+        <text x="330" y="55" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="46" fill="#fef08a" text-anchor="middle" stroke="#991b1b" stroke-width="2" letter-spacing="1">
           Daraz Top Deals!
         </text>
       </g>
@@ -305,7 +435,7 @@ export class PosterService {
       <!-- 5. Header: Top-Right Tilted Tag -->
       <g transform="translate(805, 30) rotate(5)">
         <rect width="235" height="42" rx="10" fill="#facc15" stroke="#eab308" stroke-width="2" filter="url(#pillShadow)"/>
-        <text x="117" y="27" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="13" fill="#1e1b4b" text-anchor="middle" letter-spacing="0.5">
+        <text x="117" y="27" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="13" fill="#1e1b4b" text-anchor="middle" letter-spacing="0.5">
           ★ DON&apos;T MISS THIS OFFER! ★
         </text>
       </g>
@@ -319,12 +449,12 @@ export class PosterService {
       <!-- Product Title & Verified Deal Badge inside Card -->
       <g transform="translate(90, 205)">
         <rect width="180" height="32" rx="8" fill="#fef08a" stroke="#facc15" stroke-width="1.5"/>
-        <text x="90" y="22" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="13" fill="#854d0e" text-anchor="middle">
+        <text x="90" y="22" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="13" fill="#854d0e" text-anchor="middle">
           ★ VERIFIED DEAL ★
         </text>
 
-        ${titleLines[0] ? `<text x="0" y="68" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="33" fill="#0f172a">${this.escapeXml(titleLines[0])}</text>` : ''}
-        ${titleLines[1] ? `<text x="0" y="110" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="33" fill="#0f172a">${this.escapeXml(titleLines[1])}</text>` : ''}
+        ${titleLines[0] ? `<text x="0" y="68" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="33" fill="#0f172a">${this.escapeXml(titleLines[0])}</text>` : ''}
+        ${titleLines[1] ? `<text x="0" y="110" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="33" fill="#0f172a">${this.escapeXml(titleLines[1])}</text>` : ''}
       </g>
 
       <!-- LEFT COLUMN: Feature Bullet Points & Pricing -->
@@ -335,7 +465,7 @@ export class PosterService {
         <g transform="translate(0, ${i * 48})">
           <circle cx="16" cy="16" r="14" fill="#fef08a" stroke="#eab308" stroke-width="2"/>
           <path d="M 10 16 L 14 20 L 22 12" stroke="#854d0e" stroke-width="3" fill="none" stroke-linecap="round"/>
-          <text x="44" y="22" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="18.5" fill="#1e293b">${this.escapeXml(b)}</text>
+          <text x="44" y="22" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="bold" font-size="18.5" fill="#1e293b">${this.escapeXml(b)}</text>
         </g>
         `
           )
@@ -348,7 +478,7 @@ export class PosterService {
             origPriceFormatted
               ? `
           <g transform="translate(60, 40)">
-            <text x="0" y="0" font-family="DejaVu Sans, Arial, sans-serif" font-weight="bold" font-size="28" fill="#991b1b">
+            <text x="0" y="0" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="bold" font-size="28" fill="#991b1b">
               ${this.escapeXml(origPriceFormatted)}
             </text>
             <line x1="-10" y1="-8" x2="${origPriceFormatted.length * 18}" y2="-8" stroke="#dc2626" stroke-width="4.5"/>
@@ -360,7 +490,7 @@ export class PosterService {
           <!-- Big Red Offer Price Pill -->
           <g transform="translate(0, 65)" filter="url(#pillShadow)">
             <rect width="280" height="74" rx="20" fill="url(#redPill)" stroke="#b91c1c" stroke-width="2"/>
-            <text x="140" y="52" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="38" fill="#ffffff" text-anchor="middle">
+            <text x="140" y="52" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="38" fill="#ffffff" text-anchor="middle">
               ${this.escapeXml(discPriceFormatted)}
             </text>
           </g>
@@ -368,7 +498,7 @@ export class PosterService {
           <!-- Discount Yellow Badge -->
           <g transform="translate(295, 65)" filter="url(#pillShadow)">
             <rect width="130" height="74" rx="20" fill="url(#goldGradient)" stroke="#ca8a04" stroke-width="2"/>
-            <text x="65" y="50" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="34" fill="#000000" text-anchor="middle">
+            <text x="65" y="50" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="34" fill="#000000" text-anchor="middle">
               ${this.escapeXml(discountBadgeText)}
             </text>
           </g>
@@ -383,51 +513,63 @@ export class PosterService {
         <!-- Limited Stock Alert Badge on bottom of image -->
         <g transform="translate(70, 415)">
           <rect width="300" height="34" rx="10" fill="#dc2626" stroke="#ffffff" stroke-width="2"/>
-          <text x="150" y="23" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="14" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">
+          <text x="150" y="23" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="14" fill="#ffffff" text-anchor="middle" letter-spacing="0.5">
             ⚡ LIMITED STOCK OFFER ⚡
           </text>
         </g>
       </g>
 
-      <!-- 7. Bottom Footer Banner -->
+      <!-- 7. Bottom Footer Banner with Official Daraz and WhatsApp Logos -->
       <g transform="translate(50, 895)">
         <rect width="980" height="135" rx="30" fill="#120224" stroke="#a855f7" stroke-width="3" filter="url(#cardShadow)"/>
 
-        <!-- Left: Daraz Branding -->
-        <g transform="translate(45, 42)">
+        <!-- Left: Official Daraz App Logo + Typography -->
+        <g transform="translate(45, 38)">
+          ${
+            darazLogo
+              ? `
+          <image href="data:image/png;base64,${darazLogo}" x="0" y="4" width="58" height="58" preserveAspectRatio="xMidYMid meet"/>
+          `
+              : `
           <rect width="52" height="52" rx="14" fill="#ff6000"/>
-          <path d="M 26 12 Q 26 5 32 5 Q 38 5 38 12" stroke="#ffffff" stroke-width="3" fill="none"/>
-          <rect x="18" y="12" width="28" height="28" rx="6" fill="#ffffff"/>
-          <path d="M 24 24 L 28 28 L 38 18" stroke="#ff6000" stroke-width="3.5" fill="none" stroke-linecap="round"/>
-          <text x="80" y="38" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="38" fill="#ffffff" letter-spacing="0.5">
+          `
+          }
+          <text x="75" y="46" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="38" fill="#ffffff" letter-spacing="0.5">
             Daraz
           </text>
         </g>
 
         <!-- Vertical Divider -->
-        <line x1="260" y1="30" x2="260" y2="105" stroke="#6b21a8" stroke-width="2.5"/>
+        <line x1="240" y1="30" x2="240" y2="105" stroke="#6b21a8" stroke-width="2.5"/>
 
-        <!-- Center: WhatsApp CTA Button -->
-        <g transform="translate(290, 35)">
-          <rect width="430" height="66" rx="33" fill="#16a34a" stroke="#22c55e" stroke-width="3" filter="url(#pillShadow)"/>
-          <circle cx="36" cy="33" r="22" fill="#ffffff"/>
-          <g transform="translate(18, 15) scale(1.15)">
-            <circle cx="16" cy="16" r="16" fill="#25D366"/>
-            <path d="M 16 3 C 8.8 3 3 8.8 3 16 C 3 18.5 3.7 20.8 4.9 22.8 L 3.5 28.5 L 9.3 27.2 C 11.2 28.3 13.5 29 16 29 C 23.2 29 29 23.2 29 16 C 29 8.8 23.2 3 16 3 Z" fill="#ffffff"/>
-            <path d="M 16 4.8 C 9.8 4.8 4.8 9.8 4.8 16 C 4.8 18.2 5.4 20.2 6.5 21.9 L 5.7 25.8 L 9.7 24.8 C 11.4 25.8 13.6 26.4 16 26.4 C 22.2 26.4 27.2 21.4 27.2 16 C 27.2 9.8 22.2 4.8 16 4.8 Z" fill="#25D366"/>
-            <path d="M 12.5 10.5 C 12.2 9.8 11.8 9.7 11.4 9.7 C 11 9.7 10.6 9.7 10.2 10.1 C 9.8 10.5 8.7 11.5 8.7 13.6 C 8.7 15.7 10.3 17.7 10.5 18 C 10.8 18.3 13.5 22.6 17.8 24.3 C 21.4 25.7 22.1 25.4 22.9 25.3 C 23.7 25.2 25.4 24.3 25.8 23.2 C 26.1 22.1 26.1 21.1 26 20.9 C 25.9 20.7 25.5 20.6 24.9 20.3 C 24.3 20 21.5 18.6 21 18.4 C 20.5 18.2 20.1 18.1 19.8 18.6 C 19.4 19.1 18.4 20.3 18.1 20.6 C 17.8 20.9 17.5 21 16.9 20.7 C 16.3 20.4 14.4 19.8 12.2 17.8 C 10.5 16.3 9.3 14.4 9 13.8 C 8.7 13.2 9 12.9 9.3 12.6 C 9.6 12.3 9.9 11.9 10.2 11.5 C 10.5 11.1 10.6 10.8 10.8 10.4 C 11 10 10.9 9.6 10.7 9.3 Z" fill="#ffffff"/>
+        <!-- Center: Official WhatsApp Button with Real WhatsApp Logo -->
+        <g transform="translate(265, 35)">
+          <rect width="470" height="68" rx="34" fill="#16a34a" stroke="#22c55e" stroke-width="3" filter="url(#pillShadow)"/>
+          
+          <!-- Official WhatsApp Logo Icon -->
+          <g transform="translate(18, 9)">
+            ${
+              waLogo
+                ? `
+            <image href="data:image/png;base64,${waLogo}" x="0" y="0" width="50" height="50" preserveAspectRatio="xMidYMid meet"/>
+            `
+                : `
+            <circle cx="25" cy="25" r="22" fill="#ffffff"/>
+            `
+            }
           </g>
-          <text x="75" y="41" font-family="DejaVu Sans, Arial, sans-serif" font-weight="900" font-size="18.5" fill="#ffffff">
+          
+          <text x="265" y="43" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-weight="900" font-size="18.5" fill="#ffffff" text-anchor="middle">
             Join WhatsApp Group for Links
           </text>
         </g>
 
         <!-- Right: Tagline -->
-        <g transform="translate(740, 48)">
-          <text x="110" y="30" font-family="DejaVu Sans, Arial, sans-serif" font-style="italic" font-weight="bold" font-size="18" fill="#fde047" text-anchor="middle">
+        <g transform="translate(760, 48)">
+          <text x="100" y="30" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-style="italic" font-weight="bold" font-size="17" fill="#fde047" text-anchor="middle">
             Shop Smart.
           </text>
-          <text x="110" y="55" font-family="DejaVu Sans, Arial, sans-serif" font-style="italic" font-weight="bold" font-size="18" fill="#ffffff" text-anchor="middle">
+          <text x="100" y="55" font-family="'CustomMontserrat', 'Montserrat', 'DejaVu Sans', Arial, sans-serif" font-style="italic" font-weight="bold" font-size="17" fill="#ffffff" text-anchor="middle">
             Save More!
           </text>
         </g>
@@ -435,14 +577,14 @@ export class PosterService {
     </svg>
     `;
 
-    // 4. Rasterize to high-quality JPEG Buffer
+    // 6. Rasterize to high-quality JPEG Buffer with Sharp
     const jpegBuffer = await sharp(Buffer.from(svg))
       .jpeg({ quality: 92, mozjpeg: true })
       .toBuffer();
 
-    // 5. Upload directly to MinIO
+    // 7. Upload directly to MinIO
     const posterUrl = await wahaMediaService.uploadBuffer(jpegBuffer, 'image/jpeg', 'deal-poster');
-    console.log(`[PosterService] Single deal poster generated & stored in ${Date.now() - startTime}ms: ${posterUrl}`);
+    console.log(`[PosterService] Hybrid deal poster generated & stored in ${Date.now() - startTime}ms: ${posterUrl}`);
     return posterUrl;
   }
 

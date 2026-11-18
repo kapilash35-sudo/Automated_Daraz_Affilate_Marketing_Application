@@ -62,17 +62,22 @@ export function Sidebar() {
   return (
     <aside className="w-72 bg-white border-r border-slate-200 flex flex-col justify-between shrink-0 h-screen sticky top-0 shadow-sm">
       <div>
-        {/* Brand Header */}
+        {/* Brand Header with KH Logo */}
         <div className="p-6 border-b border-slate-100 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
-            <ShoppingBag className="w-5 h-5" />
+          <div className="w-11 h-11 rounded-full overflow-hidden shadow-md border-2 border-amber-400 bg-slate-900 shrink-0 flex items-center justify-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/kh-logo.png"
+              alt="KH Daraz Deals & Updates"
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
-            <h1 className="font-extrabold text-slate-900 text-sm tracking-wide">
-              DARAZ AFFILIATE HUB
+            <h1 className="font-extrabold text-slate-900 text-sm tracking-wide flex items-center gap-1.5">
+              KH DARAZ DEALS
             </h1>
-            <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-              Marketing & Deals Engine
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              Affiliate & Deals Hub
             </p>
           </div>
         </div>
