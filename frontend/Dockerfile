@@ -7,6 +7,7 @@ RUN npm install
 
 COPY tsconfig.json next.config.mjs tailwind.config.ts postcss.config.mjs ./
 COPY src ./src/
+COPY public ./public/
 
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
@@ -23,6 +24,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=builder /app/package*.json ./
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
+COPY --from=builder /app/public ./public
 
 EXPOSE 3000
 

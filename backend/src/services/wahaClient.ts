@@ -119,16 +119,28 @@ export class WahaClient {
   ): Promise<WahaMessageResponse | null> {
     try {
       const session = sessionName || (await this.getActiveSession());
-      let resolvedFileUrl = fileUrl;
-      if (
-        resolvedFileUrl.includes('localhost:9000') ||
-        resolvedFileUrl.includes('127.0.0.1:9000')
-      ) {
-        resolvedFileUrl = resolvedFileUrl.replace(
-          /http:\/\/(localhost|127\.0\.0\.1):9000/,
-          'http://minio:9000'
-        );
+      
+      // Resolve MinIO URLs to internal Docker network container address (minio:9000)
+      // Handles localhost:9000, 127.0.0.1:9000, server IP:9000, or MINIO_PUBLIC_URL
+      const minioBucket = env.MINIO_BUCKET || 'whatsapp-media';
+      let internalMinioUrl = fileUrl;
+      const isMinioUrl =
+        fileUrl.includes(':9000/') ||
+        fileUrl.includes(`/${minioBucket}/`) ||
+        (env.MINIO_PUBLIC_URL && fileUrl.startsWith(env.MINIO_PUBLIC_URL));
+
+      if (isMinioUrl) {
+        const match =
+          fileUrl.match(/:(?:9000)\/(?:[^\/]+\/)?(.*)$/) ||
+          fileUrl.match(new RegExp(`/${minioBucket}/(.*)$`));
+        if (match && match[1]) {
+          internalMinioUrl = `http://minio:9000/${minioBucket}/${match[1]}`;
+        } else if (fileUrl.includes(':9000')) {
+          internalMinioUrl = fileUrl.replace(/http:\/\/[^/]+:9000/, 'http://minio:9000');
+        }
       }
+
+      let resolvedFileUrl = internalMinioUrl;
 
       const isImage =
         mimetype.startsWith('image/') ||
@@ -144,9 +156,8 @@ export class WahaClient {
 
       if (isImage && (fileUrl.startsWith('http://') || fileUrl.startsWith('https://'))) {
         try {
-          const fetchUrl = fileUrl.includes('minio:9000')
-            ? fileUrl.replace('minio:9000', 'localhost:9000')
-            : fileUrl;
+          const fetchUrl = internalMinioUrl;
+          console.log(`[WAHA] Pre-fetching image buffer from: ${fetchUrl}`);
 
           const imgRes = await axios.get(fetchUrl, {
             responseType: 'arraybuffer',
@@ -164,8 +175,9 @@ export class WahaClient {
             filename: filename || 'product.jpg',
             mimetype: serverMime || mimetype || 'image/jpeg',
           };
+          console.log(`[WAHA] Image buffer pre-fetched successfully (${base64Data.length} chars). Sending direct base64.`);
         } catch (fetchErr: any) {
-          console.warn(`[WAHA] Could not pre-fetch image buffer, falling back to url:`, fetchErr.message);
+          console.warn(`[WAHA] Could not pre-fetch image buffer (${fetchErr.message}), falling back to url.`);
         }
       }
 
