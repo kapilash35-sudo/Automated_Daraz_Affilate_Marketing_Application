@@ -65,17 +65,34 @@ export interface DealPost {
   destinationGroup?: WhatsAppGroup | null;
 }
 
+export interface DarazOrderRecord {
+  id: string;
+  orderId: string;
+  subId?: string | null;
+  itemId?: string | null;
+  itemName?: string | null;
+  orderAmount: number;
+  commissionAmount: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface DarazAnalyticsResponse {
   success: boolean;
   summary: {
     totalDeals: number;
     totalSent: number;
     totalClicks: number;
+    realOrdersCount?: number;
+    realCommissionEarned?: number;
+    realSalesVolume?: number;
     conversionRatePercent: string;
     avgCommissionPerOrder: number;
     expectedOrders: number;
     expectedCommission: number;
   };
+  recentOrders?: DarazOrderRecord[];
   heatmap: {
     grid: number[][];
     maxValue: number;

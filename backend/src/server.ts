@@ -14,6 +14,7 @@ import { groupRoutes } from './routes/groupRoutes.js';
 import { whatsappRoutes } from './routes/whatsappRoutes.js';
 import { dealRoutes } from './routes/dealRoutes.js';
 import { settingsRoutes } from './routes/settingsRoutes.js';
+import { darazPostbackRoutes } from './routes/darazPostbackRoutes.js';
 import { createNewsWorker } from './queues/newsWorker.js';
 import { createDarazWorker } from './queues/darazWorker.js';
 import { wahaClient } from './services/wahaClient.js';
@@ -86,6 +87,7 @@ async function bootstrap() {
   await fastify.register(whatsappRoutes);
   await fastify.register(dealRoutes);
   await fastify.register(settingsRoutes);
+  await fastify.register(darazPostbackRoutes);
 
   // 5. Initialize BullMQ Workers
   fastify.log.info('Initializing BullMQ Background Workers for News and Daraz pipelines...');

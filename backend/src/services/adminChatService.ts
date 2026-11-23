@@ -337,13 +337,13 @@ export class AdminChatService {
 
             await wahaClient.sendTextMessage(formattedChatId, `⏳ *Gemini மூலம் புதிய தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...*`);
 
-            const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
+            const directAffiliateUrl = payload.exactAffiliateUrl || payload.affiliateUrl || payload.url || post.sourceRef || '';
             const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
               title: payload.title,
               originalPrice: payload.originalPrice,
               discountPrice: payload.discountPrice,
               discountPercentage: payload.discountPercentage,
-              affiliateRedirectUrl: trackingUrl,
+              affiliateRedirectUrl: directAffiliateUrl,
               communityInviteUrl,
               communityInviteUrlSinhala,
             });
@@ -551,27 +551,8 @@ export class AdminChatService {
       const tamilCount = destinationGroups.filter((g) => g.language === 'TAMIL' || g.language === 'ALL').length;
       const sinhalaCount = destinationGroups.filter((g) => g.language === 'SINHALA' || g.language === 'ALL').length;
 
-      // Save Post as PENDING_APPROVAL in database first to get unique postId
-      let finalMediaUrl = (dealData.mediaUrl && dealData.mediaUrl !== 'NONE') ? dealData.mediaUrl : null;
-      try {
-        const generatedPosterUrl = await posterService.createAndUploadPoster({
-          title: dealData.title,
-          originalPrice: dealData.originalPrice,
-          discountPrice: dealData.discountPrice,
-          discountPercentage: dealData.discountPercentage,
-          mediaUrl: finalMediaUrl,
-          features: [
-            dealData.productDetails || '100% Original Brand Guarantee',
-            'Island-wide Fast Express Delivery',
-            'Cash on Delivery (COD) Available',
-          ],
-        });
-        if (generatedPosterUrl) {
-          finalMediaUrl = generatedPosterUrl;
-        }
-      } catch (posterErr: any) {
-        console.warn('[AdminChatService] Custom poster generation fallback to raw image:', posterErr.message);
-      }
+      // Use clean original Daraz product image directly (no custom poster synthesis)
+      const finalMediaUrl = (dealData.mediaUrl && dealData.mediaUrl !== 'NONE') ? dealData.mediaUrl : null;
 
       const post = await prisma.post.create({
         data: {
@@ -585,8 +566,8 @@ export class AdminChatService {
         },
       });
 
-      // Generate Official Tracking Redirect URL
-      const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
+      // Use Direct Official Daraz Affiliate URL (no intermediate redirect)
+      const directAffiliateUrl = dealData.exactAffiliateUrl || dealData.affiliateUrl || dealData.url || '';
 
       // AI Copywriting with Gemini: generate both in parallel
       const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
@@ -594,7 +575,7 @@ export class AdminChatService {
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
         discountPercentage: dealData.discountPercentage,
-        affiliateRedirectUrl: trackingUrl,
+        affiliateRedirectUrl: directAffiliateUrl,
         communityInviteUrl,
         communityInviteUrlSinhala,
       });

@@ -132,27 +132,8 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
       const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
-      // Generate Custom Branded Deal Poster
-      let finalMediaUrl = dealData.mediaUrl || null;
-      try {
-        const generatedPosterUrl = await posterService.createAndUploadPoster({
-          title: dealData.title,
-          originalPrice: dealData.originalPrice,
-          discountPrice: dealData.discountPrice || dealData.originalPrice || '0',
-          discountPercentage: dealData.discountPercentage,
-          mediaUrl: finalMediaUrl,
-          features: [
-            '100% Original Brand Guarantee',
-            'Island-wide Fast Express Delivery',
-            'Cash on Delivery (COD) Available',
-          ],
-        });
-        if (generatedPosterUrl) {
-          finalMediaUrl = generatedPosterUrl;
-        }
-      } catch (posterErr: any) {
-        console.warn('[DealRoutes] Custom poster generation fallback to raw image:', posterErr.message);
-      }
+      // Use clean original Daraz product image directly (no custom poster synthesis)
+      const finalMediaUrl = dealData.mediaUrl || null;
 
       // Create post first to acquire unique postId
       const post = await prisma.post.create({
@@ -167,7 +148,8 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${post.id}`;
+      // Use Direct Official Daraz Affiliate URL (no intermediate redirect)
+      const directAffiliateUrl = dealData.exactAffiliateUrl || post.sourceRef || '';
 
       // AI Copywriting with Gemini: generate both Tamil and Sinhala in parallel
       const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
@@ -175,7 +157,7 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
         discountPercentage: dealData.discountPercentage,
-        affiliateRedirectUrl: trackingUrl,
+        affiliateRedirectUrl: directAffiliateUrl,
         communityInviteUrl,
         communityInviteUrlSinhala,
       });

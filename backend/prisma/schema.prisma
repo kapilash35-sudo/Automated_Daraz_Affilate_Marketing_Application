@@ -99,3 +99,25 @@ model Engagement {
   @@index([postId, type])
   @@index([type, recordedAt])
 }
+
+model DarazOrder {
+  id               String   @id @default(cuid())
+  orderId          String   @unique
+  subId            String?  // sub1 / click ID from affiliate tracking
+  itemId           String?  // SKU / Product ID
+  itemName         String?
+  itemPrice        Float?   @default(0)
+  orderAmount      Float    @default(0)
+  commissionAmount Float    @default(0)
+  currency         String   @default("LKR")
+  status           String   @default("Order") // Order, AddToCart, Delivered, Cancelled
+  eventTime        DateTime @default(now())
+  rawPayload       Json?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([status])
+  @@index([createdAt])
+}
+

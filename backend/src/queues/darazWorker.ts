@@ -33,11 +33,10 @@ export function createDarazWorker() {
 
       const payload: any = post.rawPayload || {};
 
-      // 2. Resolve URLs
-      const directAffiliateUrl = payload.exactAffiliateUrl || post.sourceRef || '';
+      // 2. Resolve URLs (Direct Daraz Affiliate URL)
+      const directAffiliateUrl = payload.exactAffiliateUrl || payload.affiliateUrl || payload.url || post.sourceRef || '';
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
       const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
-      const trackingUrl = `${env.BASE_REDIRECT_URL}/r/${postId}`;
 
       // 3. Resolve Ad Promotional Copies (Tamil & Sinhala):
       let formattedTextTamil = post.processedText;
@@ -50,7 +49,7 @@ export function createDarazWorker() {
           originalPrice: payload.originalPrice,
           discountPrice: payload.discountPrice || payload.price,
           discountPercentage: payload.discountPercentage,
-          affiliateRedirectUrl: trackingUrl,
+          affiliateRedirectUrl: directAffiliateUrl,
           productDetails: payload.productDetails || payload.description,
           category: payload.category,
           communityInviteUrl: communityInviteUrl || undefined,
@@ -61,47 +60,17 @@ export function createDarazWorker() {
         if (!formattedTextSinhala || !formattedTextSinhala.trim()) formattedTextSinhala = bilingual.sinhalaText;
       }
 
-      // Helper to sanitize links in copy:
+      // Helper to ensure direct affiliate link is used in copy:
       const sanitizeCopy = (text: string) => {
         let t = text;
-        if (t.includes('localhost:4000/r/')) {
-          t = t.replace(/https?:\/\/localhost:4000\/r\/[^\s]+/g, trackingUrl);
-        }
-        if (directAffiliateUrl && t.includes(directAffiliateUrl)) {
-          t = t.replace(directAffiliateUrl, trackingUrl);
+        if (directAffiliateUrl && (t.includes('localhost:4000/r/') || t.includes('/r/'))) {
+          t = t.replace(/https?:\/\/[^\s]+\/r\/[^\s]+/g, directAffiliateUrl);
         }
         return t;
       };
 
       formattedTextTamil = sanitizeCopy(formattedTextTamil);
       formattedTextSinhala = sanitizeCopy(formattedTextSinhala);
-
-      // Ensure post has custom branded deal poster
-      if (post.mediaUrl && !post.mediaUrl.includes('deal-poster')) {
-        try {
-          const generatedPoster = await posterService.createAndUploadPoster({
-            title: payload.title || 'சிறப்பு தள்ளுபடி தயாரிப்பு',
-            originalPrice: payload.originalPrice,
-            discountPrice: payload.discountPrice || payload.price,
-            discountPercentage: payload.discountPercentage,
-            mediaUrl: post.mediaUrl,
-            features: [
-              payload.productDetails || '100% Original Brand Guarantee',
-              'Island-wide Fast Express Delivery',
-              'Cash on Delivery (COD) Available',
-            ],
-          });
-          if (generatedPoster) {
-            post.mediaUrl = generatedPoster;
-            await prisma.post.update({
-              where: { id: post.id },
-              data: { mediaUrl: generatedPoster },
-            });
-          }
-        } catch (posterErr: any) {
-          console.warn('[DarazWorker] Custom poster generation fallback:', posterErr.message);
-        }
-      }
 
       // 4. Find Active Destination Groups for DARAZ
       const destinationGroups = await prisma.group.findMany({

@@ -5,25 +5,25 @@ import { Header } from '../../components/Header';
 import { MetricCard } from '../../components/MetricCard';
 import { HeatmapGrid } from '../../components/HeatmapGrid';
 import { TopDarazTable } from '../../components/TopDarazTable';
-import { RevenueCalculator } from '../../components/RevenueCalculator';
+import { LiveOrdersTable } from '../../components/LiveOrdersTable';
 import {
   ShoppingBag,
-  MousePointerClick,
+  ShoppingCart,
   DollarSign,
   Tag,
+  TrendingUp,
 } from 'lucide-react';
-import { fetchDarazAnalytics, fetchSettings } from '../../lib/api';
+import { fetchDarazAnalytics } from '../../lib/api';
 import { DarazAnalyticsResponse } from '../../lib/types';
 
 export default function AnalyticsPage() {
   const [data, setData] = useState<DarazAnalyticsResponse | null>(null);
-  const [conversionRate, setConversionRate] = useState(0.025);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async (convRate = conversionRate) => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const res = await fetchDarazAnalytics(convRate.toString());
+      const res = await fetchDarazAnalytics();
       setData(res);
     } catch (err: any) {
       console.error('Failed to load Daraz analytics:', err.message);
@@ -33,33 +33,19 @@ export default function AnalyticsPage() {
   };
 
   useEffect(() => {
-    const init = async () => {
-      try {
-        const settings = await fetchSettings().catch(() => null);
-        if (settings && settings.conversionRate) {
-          setConversionRate(parseFloat(settings.conversionRate));
-        }
-      } catch {}
-      await loadData();
-    };
-    init();
+    loadData();
   }, []);
-
-  const handleConversionRateChange = (rate: number) => {
-    setConversionRate(rate);
-    loadData(rate);
-  };
 
   return (
     <div className="space-y-8">
       <Header
         title="Revenue & Performance Analytics"
-        subtitle="Track affiliate link click volume, buyer peak engagement hours, and actual projected commission earnings."
-        onRefresh={() => loadData(conversionRate)}
+        subtitle="100% real-time verified Daraz purchases, webhook postback orders, and actual earned commissions."
+        onRefresh={loadData}
         isLoading={isLoading}
       />
 
-      {/* Primary KPI Grid */}
+      {/* Primary KPI Grid (100% Real-Time Metrics) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         <MetricCard
           title="Total Deals Broadcasted"
@@ -70,45 +56,42 @@ export default function AnalyticsPage() {
         />
 
         <MetricCard
-          title="Affiliate Link Clicks"
-          value={data?.summary.totalClicks ?? '—'}
-          subtitle="Real-time Redirect Logs"
-          icon={MousePointerClick}
-          color="blue"
-          trend="Tracked via /r/:postId"
-        />
-
-        <MetricCard
-          title="Estimated Orders"
-          value={data ? Math.round(data.summary.totalClicks * conversionRate) : '—'}
-          subtitle={`At ${(conversionRate * 100).toFixed(1)}% Conv. Rate`}
-          icon={ShoppingBag}
+          title="Confirmed Orders"
+          value={data?.summary.realOrdersCount ?? 0}
+          subtitle="Real Webhook Purchases"
+          icon={ShoppingCart}
           color="purple"
+          trend="100% Verified"
         />
 
         <MetricCard
-          title="Expected Commission"
+          title="Total Sales Volume (GMV)"
           value={
             data
-              ? `Rs. ${data.summary.expectedCommission.toLocaleString()}`
+              ? `Rs. ${(data.summary.realSalesVolume ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
               : '—'
           }
-          subtitle="Real-time Bot Commissions"
+          subtitle="Total Goods Sold on Daraz"
+          icon={TrendingUp}
+          color="blue"
+        />
+
+        <MetricCard
+          title="Actual Commission Earned"
+          value={
+            data
+              ? `Rs. ${(data.summary.realCommissionEarned ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+              : '—'
+          }
+          subtitle="Verified Net Earnings"
           icon={DollarSign}
           color="emerald"
-          trend="Projected Payout"
+          trend="Real Cash Payout"
         />
       </div>
 
-      {/* Interactive Revenue Estimator Slider Widget (Conversion Rate Only) */}
-      {data && (
-        <RevenueCalculator
-          totalClicks={data.summary.totalClicks}
-          expectedCommission={data.summary.expectedCommission}
-          initialConversionRate={conversionRate}
-          onConversionRateChange={handleConversionRateChange}
-        />
-      )}
+      {/* Live Verified Daraz Orders Table (from S2S Webhook) */}
+      <LiveOrdersTable orders={data?.recentOrders || []} />
 
       {/* Buyer Click-Through Heatmap (7x24 Day-vs-Hour Grid) */}
       {data && (

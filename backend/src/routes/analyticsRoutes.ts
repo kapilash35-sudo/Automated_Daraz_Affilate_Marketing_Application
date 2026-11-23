@@ -195,8 +195,8 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       const conversionRate = parseFloat(query?.conversionRate || '0.025'); // 2.5% default
       const avgCommission = parseFloat(query?.avgCommission || '380'); // Rs 380 default (~$1.25)
 
-      // 1. Metric Counts
-      const [totalDeals, totalSent, totalClicks, allPosts] = await Promise.all([
+      // 1. Metric Counts & Real Webhook Orders
+      const [totalDeals, totalSent, totalClicks, allPosts, realOrdersCount, realOrderSums, recentOrders] = await Promise.all([
         prisma.post.count({ where: { type: 'DARAZ' } }),
         prisma.post.count({ where: { type: 'DARAZ', status: 'SENT' } }),
         prisma.engagement.count({ where: { type: 'CLICK' } }),
@@ -204,7 +204,21 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           where: { type: 'DARAZ' },
           select: { clicksCount: true, rawPayload: true },
         }),
+        prisma.darazOrder.count(),
+        prisma.darazOrder.aggregate({
+          _sum: {
+            orderAmount: true,
+            commissionAmount: true,
+          },
+        }),
+        prisma.darazOrder.findMany({
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+        }),
       ]);
+
+      const realCommissionEarned = Math.round((realOrderSums._sum.commissionAmount || 0) * 100) / 100;
+      const realSalesVolume = Math.round((realOrderSums._sum.orderAmount || 0) * 100) / 100;
 
       const expectedOrders = Math.round(totalClicks * conversionRate);
 
@@ -293,11 +307,15 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           totalDeals,
           totalSent,
           totalClicks,
+          realOrdersCount,
+          realCommissionEarned,
+          realSalesVolume,
           conversionRatePercent: (conversionRate * 100).toFixed(1),
           avgCommissionPerOrder: avgCommission,
           expectedOrders,
           expectedCommission,
         },
+        recentOrders,
         heatmap: {
           grid: heatmapGrid,
           maxValue: maxClickValue || 1,
