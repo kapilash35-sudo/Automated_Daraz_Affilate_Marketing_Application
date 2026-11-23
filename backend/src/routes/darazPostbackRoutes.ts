@@ -181,6 +181,9 @@ export const darazPostbackRoutes: FastifyPluginAsync = async (fastify) => {
       }
 
       return reply.status(200).send({
+        code: 0,
+        msg: 'success',
+        data: 'success',
         success: true,
         message: isTestOrder ? 'Mock test verification acknowledged successfully' : 'Postback processed successfully',
         orderId: order.orderId,

@@ -116,6 +116,7 @@ model DarazOrder {
   itemId           String?  // {_p_purchased_item_id}
   sku              String?  // {_p_sku_daraz}
   itemName         String?
+  itemPrice        Float?   @default(0)
   category1        String?  // {_p_cate_name_lv1}
   category2        String?  // {_p_cate_name_lv2}
   deviceOs         String?  // {_device_os}
