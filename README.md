@@ -1,6 +1,6 @@
 # Daraz Affiliate & WhatsApp Marketing Automation Engine
 
-> Enterprise-grade automation platform for e-commerce affiliate marketing, AI copywriting, real-time click tracking, buyer analytics, and WhatsApp broadcast management.
+> Enterprise-grade automation platform for e-commerce affiliate marketing, AI copywriting, Server-to-Server (S2S) postback tracking, real-time verified revenue analytics, and WhatsApp broadcast management.
 
 [![Docker](https://img.shields.io/badge/Docker-Compose_Microservices-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![Fastify](https://img.shields.io/badge/Backend-Fastify_TypeScript-000000?logo=fastify&logoColor=white)](https://fastify.dev/)
@@ -14,7 +14,7 @@
 
 ## 📖 Overview
 
-The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated marketing infrastructure designed for digital publishers and affiliate marketers. It streamlines the end-to-end workflow of discovering e-commerce deals, generating persuasive bilingual (Tamil & Sinhala) marketing copy with generative AI, acquiring instant approval via WhatsApp polls, broadcasting targeted promotions to segregated Tamil and Sinhala WhatsApp communities, and tracking buyer conversions in real-time.
+The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated marketing infrastructure designed for digital publishers and affiliate marketers. It streamlines the end-to-end workflow of discovering e-commerce deals, generating persuasive bilingual (Tamil & Sinhala) marketing copy with generative AI, acquiring instant approval via WhatsApp polls, broadcasting targeted promotions to segregated Tamil and Sinhala WhatsApp communities, and tracking verified buyer conversions and cash payouts in real-time via official Daraz Server-to-Server (S2S) Postback Webhooks.
 
 ---
 
@@ -27,20 +27,36 @@ The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated m
 - **Zero-Dashboard Operation:** Manage the entire marketing lifecycle directly within WhatsApp.
 - **Dynamic Control Menus:** Interactive voting polls for initiating deals, updating community links, and checking performance metrics.
 - **Product Extraction:** Automatically parses product titles, original prices, discounted prices, discount percentages, and media assets.
-- **Photo Preferences:** Support for automated product image scraping, custom manual photo uploads, or text-only promotions.
+- **Clean Authentic Photos:** Dispatches clean, high-resolution original product images without artificial overlays, maximizing buyer click-through and authenticity.
 - **Interactive Approval Gates:** Generates ad previews with commission estimates; broadcast only triggers upon admin confirmation via interactive WhatsApp polls.
 
-### 2. Click Tracking & Direct Deep Linking
-- **Precision Attribution:** Dedicated redirect engine (`/r/:postId`) records visitor IP, device type, user agent, and timestamp before instant redirection.
-- **Affiliate Preservation:** Drops the publisher's affiliate parameters and seamlessly deep-links mobile users into the e-commerce app.
-- **Zero Latency:** High-throughput redirection via Fastify and indexed relational lookups.
+### 2. Direct Official Affiliate Links & Sub-Tracking
+- **Direct Official Daraz Links:** Delivers trusted `s.daraz.lk` URLs directly in WhatsApp copy, maximizing user trust and ensuring seamless mobile app deep-linking.
+- **Automated Sub-Tracking Parameters:** Dynamically appends tracking tags to every shared link:
+  - `sub_aff_id=wa_tam` / `wa_sin` (Affiliate channel & language identification)
+  - `sub_id1=${post.id}` (Internal Deal / Post tracking ID)
+  - `sub_id2=${language}` (Target audience language)
 
-### 3. Buyer Engagement Heatmap (24h x 7d Matrix)
-- **Timezone-Aware Scheduling:** Aggregates link clicks across days and hours, normalized to local market time.
-- **Peak Engagement Insights:** Identifies prime buyer activity windows (e.g., lunch breaks, evening leisure hours) to schedule high-ticket deal broadcasts for maximum conversion.
-- **Interactive Analytics:** Includes revenue calculators and deal performance rankings.
+### 3. Server-to-Server (S2S) Postback Webhook Engine
+- **Dedicated S2S Webhook:** Fast, reliable endpoint (`/api/webhooks/daraz/postback`) capturing all Daraz pre-defined and custom macros:
+  - Order Identifiers: `{_p_transaction}`, `{_p_sub_transaction}`
+  - Financials: `{_p_pay_amount}`, `{_p_payout}`, `{_p_com_rate}`, `{_p_currency}`
+  - Product & Catalog: `{_p_purchased_item_id}`, `{_p_sku_daraz}`, `{_p_cate_name_lv1}`, `{_p_cate_name_lv2}`
+  - Buyer Context: `{_device_os}`, `{_p_platform}`, `{_p_new_user}`, `{_p_status}`, `{_p_conversion_time}`
+  - Attribution Tags: `{sub_aff_id}`, `{sub_id1}`, `{sub_id2}`
+- **Automatic Deal Attribution:** Matches incoming conversions with the original broadcasted Post, updating post orders count, actual revenue, and verified net commission.
+- **Instant Admin WhatsApp Notification:** Automatically alerts the administrator on WhatsApp as soon as an order is confirmed on Daraz, detailing the purchased item, sale amount, and earned commission.
+- **Test Ping Compatibility:** Intelligently identifies and accepts Daraz Adsense connectivity checks (`Run Test`), returning standard `{ code: 0, msg: "success", data: "success" }` responses.
 
-### 4. Anti-Ban Broadcast Safeguards
+### 4. 100% Verified Revenue & Performance Analytics
+- **Zero Guesswork:** Replaced theoretical estimation models with 100% verified real webhook metrics:
+  - **Confirmed Orders:** Real count of webhook purchases attributed to your broadcasts.
+  - **Total Sales Volume (GMV):** Actual value of goods sold through your links.
+  - **Actual Commission Earned:** Real cash net earnings verified by Daraz postback.
+- **Live Verified Daraz Orders Table:** Full audit table showing transaction details, category, device type, platform, customer status (New vs Existing), order value, and net payout.
+- **Buyer Engagement Heatmap (24h x 7d Matrix):** Aggregates buyer activity across days and hours normalized to local time, pinpointing peak conversion windows.
+
+### 5. Anti-Ban Broadcast Safeguards
 - **Paced Dispatches:** Mandatory configurable delays (e.g., 30s) between group deliveries to adhere to messaging rate limits.
 - **Queue Throttling:** Background job management via BullMQ and Redis with automatic retry backoff.
 - **Duplicate Prevention:** Semantic similarity checks and link deduplication to prevent spamming channels with repeated deals.
@@ -50,16 +66,17 @@ The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated m
 ## 🏗️ Architecture
 
 ```
-                          ┌───────────────────────────┐
-                          │   Admin WhatsApp Client   │
-                          └─────────────┬─────────────┘
-                                        │
-                                        ▼
-                                 ┌──────────────┐
-                                 │ WAHA Gateway │
-                                 └──────┬───────┘
-                                        │ Inbound Webhooks
-                                        ▼
+                                  ┌───────────────────────────┐
+                                  │   Admin WhatsApp Client   │
+                                  └─────────────┬─────────────┘
+                                                │
+                                                ▼
+┌─────────────────────────────┐          ┌──────────────┐
+│  Daraz Affiliate Adsense    │          │ WAHA Gateway │
+│  (S2S Postback Webhook)     │          └──────┬───────┘
+└──────────────┬──────────────┘                 │
+               │ Macro Payloads                 │ Inbound Events & Polls
+               ▼                                ▼
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                             Reverse Proxy (HTTPS)                           │
 └──────────────────────┬───────────────────────────────┬──────────────────────┘
@@ -67,22 +84,31 @@ The **Daraz Affiliate & WhatsApp Marketing Automation Engine** is an automated m
                        ▼                               ▼
         ┌─────────────────────────────┐  ┌───────────────────────────┐
         │  Fastify REST API & Engine  │  │   Next.js 14 Dashboard    │
-        │  (Node.js 22 + TypeScript)  │  │   (Analytics & Controls)  │
+        │  - S2S Postback Receiver    │  │   - Real-Time Orders      │
+        │  - Sub-Tracking Injector    │  │   - Verified GMV & Cash   │
+        │  - Bilingual Copywriter     │  │   - Buyer Heatmap         │
         └──────────────┬──────────────┘  └───────────────────────────┘
                        │
          ┌─────────────┼─────────────┐
          ▼             ▼             ▼
   ┌────────────┐ ┌───────────┐ ┌───────────┐
   │ PostgreSQL │ │  Redis 7  │ │ MinIO S3  │
-  │  (Prisma)  │ │ (BullMQ)  │ │ (Storage) │
+  │ (Orders &  │ │ (BullMQ   │ │ (Assets)  │
+  │  Posts)    │ │  Queues)  │ │           │
   └────────────┘ └─────┬─────┘ └───────────┘
                        │
                        ▼
         ┌─────────────────────────────┐
         │   Background Queue Worker   │
         │   - Scraper & Gemini AI     │
-        │   - Tracking URL Injector   │
+        │   - Direct s.daraz.lk Links │
         │   - Rate-Limited Dispatch   │
+        └──────────────┬──────────────┘
+                       │
+                       ▼
+        ┌─────────────────────────────┐
+        │ Targeted WhatsApp Community │
+        │ (Tamil & Sinhala Groups)    │
         └─────────────────────────────┘
 ```
 
@@ -187,15 +213,33 @@ All services should report healthy and running:
 ### 2. Posting Deals via WhatsApp Bot
 1. From the authorized administrator phone number, send a message (e.g. `hi`) to the connected number.
 2. Select **Post Ad** from the interactive menu poll.
-3. Paste any product URL (e.g., `https://www.daraz.lk/products/...`).
+3. Paste any Daraz product or affiliate URL (e.g., `https://www.daraz.lk/products/...` or `https://s.daraz.lk/s.XXX`).
 4. Select your preferred media mode (auto-scraped image, custom upload, or text-only).
-5. Review the AI-generated promotional copy and estimated commission.
-6. Confirm via the approval poll to queue the broadcast to your configured destination channels.
+5. Enter the estimated or actual commission amount in LKR when prompted.
+6. Review the Gemini AI-generated bilingual promotional copy.
+7. Confirm via the interactive approval poll (`1️⃣ ஆம், குரூப்களுக்கு அனுப்புக`) to queue rate-limited broadcasts to your configured destination channels.
 
-### 3. Monitoring Real-Time Conversions
+### 3. Configuring Daraz S2S Postback
+1. Log in to the [Daraz Affiliate Adsense Portal](https://adsense.daraz.lk/) and navigate to **Integration > Postback URL**.
+2. Click **Add New** and enter:
+   - **Name:** e.g., `KH Live Tracker`
+   - **Type:** `Order`
+   - **URL:** Copy the pre-configured Postback URL from your Dashboard:
+     ```
+     https://<your-domain>/api/webhooks/daraz/postback?order_id={_p_transaction}&sub_order_id={_p_sub_transaction}&amount={_p_pay_amount}&payout={_p_payout}&commission_rate={_p_com_rate}&currency={_p_currency}&status={_p_status}&item_id={_p_purchased_item_id}&sku={_p_sku_daraz}&category1={_p_cate_name_lv1}&category2={_p_cate_name_lv2}&device_os={_device_os}&platform={_p_platform}&is_new_user={_p_new_user}&conversion_time={_p_conversion_time}&sub_aff_id={sub_aff_id}&post_id={sub_id1}&language={sub_id2}
+     ```
+3. Save and click **Activate**.
+4. Use the built-in **Run Test** tool to verify connectivity. The server returns `{ code: 0, msg: "success", data: "success" }`.
+
+### 4. Monitoring Real-Time Conversions & Payouts
 1. Open the analytics dashboard at `/analytics`.
-2. View key metrics: total broadcasted promotions, real-time affiliate link clicks, and projected earnings.
-3. Consult the **Buyer Engagement Heatmap** to analyze peak click periods and optimize future broadcast schedules.
+2. View 100% real-time verified metrics:
+   - **Total Deals Broadcasted:** Count of active broadcast campaigns.
+   - **Confirmed Orders:** Actual verified orders attributed via webhook.
+   - **Total Sales Volume (GMV):** Real total value of goods sold on Daraz.
+   - **Actual Commission Earned:** Net verified cash payout from confirmed transactions.
+3. Inspect recent transactions in the **Live Verified Daraz Orders Table** for full item, SKU, category, and device attribution.
+4. Consult the **Buyer Engagement Heatmap** to analyze peak purchasing windows and optimize broadcast schedules.
 
 ---
 
