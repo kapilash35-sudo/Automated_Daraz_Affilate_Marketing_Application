@@ -28,10 +28,27 @@ export const darazPostbackRoutes: FastifyPluginAsync = async (fastify) => {
           `daraz_${Date.now()}`
       );
 
-      // Check if this is a Daraz "Run Test" mock ping
+      // Check if this is a Daraz "Run Test" mock ping or raw template verification ping
       const isTestOrder =
         orderId.toLowerCase().includes('test') ||
+        orderId.includes('{_p_') ||
+        orderId.includes('{') ||
+        String(params.amount || '').includes('{_p_') ||
+        String(params.payout || '').includes('{_p_') ||
         String(params.sub_order_id || '').toLowerCase().includes('test');
+
+      // If it's Daraz's connection test / template verification, return success immediately without creating dummy order
+      if (isTestOrder) {
+        fastify.log.info({ orderId }, '[DarazPostback] Acknowledged Daraz verification test ping without saving dummy order');
+        return reply.status(200).send({
+          code: 0,
+          msg: 'success',
+          data: 'success',
+          success: true,
+          message: 'Mock test verification acknowledged successfully',
+          orderId: orderId,
+        });
+      }
 
       const subOrderId = params.sub_order_id || params._p_sub_transaction || null;
       const subAffId = params.sub_aff_id || null;
