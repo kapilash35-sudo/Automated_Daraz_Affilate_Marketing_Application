@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from 'fastify';
 import { z } from 'zod';
 import { prisma } from '../config/prisma.js';
 import { env } from '../config/env.js';
-import { DarazExtractor } from '../services/darazExtractor.js';
+import { DarazExtractor, attachDarazSubTracking } from '../services/darazExtractor.js';
 import { copywritingService } from '../services/copywritingService.js';
 import { posterService } from '../services/posterService.js';
 import { SettingsService } from '../services/settingsService.js';
@@ -148,8 +148,10 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         },
       });
 
-      // Use Direct Official Daraz Affiliate URL (no intermediate redirect)
+      // Use Direct Official Daraz Affiliate URL with Auto-Tracked Macros
       const directAffiliateUrl = dealData.exactAffiliateUrl || post.sourceRef || '';
+      const trackedTamilUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'TAMIL');
+      const trackedSinhalaUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'SINHALA');
 
       // AI Copywriting with Gemini: generate both Tamil and Sinhala in parallel
       const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
@@ -157,7 +159,8 @@ export const dealRoutes: FastifyPluginAsync = async (fastify) => {
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
         discountPercentage: dealData.discountPercentage,
-        affiliateRedirectUrl: directAffiliateUrl,
+        affiliateRedirectUrl: trackedTamilUrl,
+        affiliateRedirectUrlSinhala: trackedSinhalaUrl,
         communityInviteUrl,
         communityInviteUrlSinhala,
       });

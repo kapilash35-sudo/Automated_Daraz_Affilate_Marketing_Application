@@ -234,11 +234,15 @@ Return ONLY the final WhatsApp message text. Do not wrap in markdown code fences
    * Generates both Tamil and Sinhala promotional copies in parallel.
    */
   async generateBilingualDarazDeals(
-    input: DarazCopywritingInput
+    input: DarazCopywritingInput & { affiliateRedirectUrlSinhala?: string }
   ): Promise<{ tamilText: string; sinhalaText: string }> {
+    const sinhalaInput = input.affiliateRedirectUrlSinhala
+      ? { ...input, affiliateRedirectUrl: input.affiliateRedirectUrlSinhala }
+      : input;
+
     const [tamilText, sinhalaText] = await Promise.all([
       this.formatDarazDealForWhatsApp(input),
-      this.formatDarazDealSinhalaForWhatsApp(input),
+      this.formatDarazDealSinhalaForWhatsApp(sinhalaInput),
     ]);
     return { tamilText, sinhalaText };
   }

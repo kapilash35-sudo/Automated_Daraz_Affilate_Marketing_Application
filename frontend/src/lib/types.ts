@@ -68,14 +68,30 @@ export interface DealPost {
 export interface DarazOrderRecord {
   id: string;
   orderId: string;
+  subOrderId?: string | null;
+  subAffId?: string | null;
   subId?: string | null;
+  postId?: string | null;
+  language?: string | null;
   itemId?: string | null;
+  sku?: string | null;
   itemName?: string | null;
+  category1?: string | null;
+  category2?: string | null;
+  deviceOs?: string | null;
+  platform?: string | null;
+  isNewUser?: boolean | null;
+  commissionRate?: number | null;
   orderAmount: number;
   commissionAmount: number;
   currency: string;
   status: string;
   createdAt: string;
+  post?: {
+    id: string;
+    mediaUrl?: string | null;
+    rawPayload?: any;
+  } | null;
 }
 
 export interface DarazAnalyticsResponse {
@@ -106,6 +122,9 @@ export interface DarazAnalyticsResponse {
     discountPercentage?: number | string;
     commissionAmount?: number;
     clicksCount: number;
+    ordersCount?: number;
+    actualRevenue?: number;
+    actualCommission?: number;
     estimatedRevenue: number;
     mediaUrl: string | null;
     sentAt: string | null;
@@ -115,6 +134,9 @@ export interface DarazAnalyticsResponse {
     title: string;
     status: PostStatus;
     clicksCount: number;
+    ordersCount?: number;
+    actualRevenue?: number;
+    actualCommission?: number;
     createdAt: string;
     sentAt: string | null;
   }>;

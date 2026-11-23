@@ -78,10 +78,14 @@ model Post {
   sentAt             DateTime?
   clicksCount        Int            @default(0)
   reactionsCount     Int            @default(0)
+  ordersCount        Int            @default(0)
+  actualRevenue      Float          @default(0)
+  actualCommission   Float          @default(0)
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 
   engagements        Engagement[]
+  darazOrders        DarazOrder[]
 
   @@index([status, type, createdAt])
   @@index([sentAt])
@@ -103,21 +107,34 @@ model Engagement {
 model DarazOrder {
   id               String   @id @default(cuid())
   orderId          String   @unique
-  subId            String?  // sub1 / click ID from affiliate tracking
-  itemId           String?  // SKU / Product ID
+  subOrderId       String?  // {_p_sub_transaction}
+  subAffId         String?  // {sub_aff_id}
+  subId            String?  // {sub_id1}
+  postId           String?
+  post             Post?    @relation(fields: [postId], references: [id], onDelete: SetNull)
+  language         String?  // {sub_id2} TAMIL / SINHALA
+  itemId           String?  // {_p_purchased_item_id}
+  sku              String?  // {_p_sku_daraz}
   itemName         String?
-  itemPrice        Float?   @default(0)
-  orderAmount      Float    @default(0)
-  commissionAmount Float    @default(0)
+  category1        String?  // {_p_cate_name_lv1}
+  category2        String?  // {_p_cate_name_lv2}
+  deviceOs         String?  // {_device_os}
+  platform         String?  // {_p_platform}
+  isNewUser        Boolean? @default(false) // {_p_new_user}
+  commissionRate   Float?   @default(0) // {_p_com_rate}
+  orderAmount      Float    @default(0) // {_p_pay_amount}
+  commissionAmount Float    @default(0) // {_p_payout}
   currency         String   @default("LKR")
-  status           String   @default("Order") // Order, AddToCart, Delivered, Cancelled
+  status           String   @default("Order") // {_p_status}
   eventTime        DateTime @default(now())
   rawPayload       Json?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
   @@index([orderId])
+  @@index([postId])
   @@index([status])
+  @@index([language])
   @@index([createdAt])
 }
 

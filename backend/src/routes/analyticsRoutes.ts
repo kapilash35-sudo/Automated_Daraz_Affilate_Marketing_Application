@@ -214,6 +214,15 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
         prisma.darazOrder.findMany({
           orderBy: { createdAt: 'desc' },
           take: 20,
+          include: {
+            post: {
+              select: {
+                id: true,
+                mediaUrl: true,
+                rawPayload: true,
+              },
+            },
+          },
         }),
       ]);
 
@@ -270,16 +279,19 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
       slots.sort((a, b) => b.count - a.count);
       const topPeakClickSlots = slots.slice(0, 3);
 
-      // 3. Top Performing Daraz Deals (ranked by clicksCount)
+      // 3. Top Performing Daraz Deals (ranked by actualCommission or clicksCount)
       const topProducts = await prisma.post.findMany({
         where: {
           type: 'DARAZ',
         },
-        orderBy: { clicksCount: 'desc' },
+        orderBy: [{ actualCommission: 'desc' }, { clicksCount: 'desc' }],
         take: 10,
         select: {
           id: true,
           clicksCount: true,
+          ordersCount: true,
+          actualRevenue: true,
+          actualCommission: true,
           mediaUrl: true,
           sentAt: true,
           rawPayload: true,
@@ -295,6 +307,9 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           id: true,
           status: true,
           clicksCount: true,
+          ordersCount: true,
+          actualRevenue: true,
+          actualCommission: true,
           sentAt: true,
           createdAt: true,
           rawPayload: true,
@@ -325,7 +340,7 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
           const payload = p.rawPayload as any;
           const clicks = p.clicksCount;
           const itemCommission = payload?.commissionAmount ? Number(payload.commissionAmount) : avgCommission;
-          const estRevenue = Math.round(clicks * conversionRate * itemCommission);
+          const estRevenue = p.actualCommission > 0 ? p.actualCommission : Math.round(clicks * conversionRate * itemCommission);
           return {
             id: p.id,
             title: payload?.title || 'Daraz Deal Item',
@@ -334,6 +349,9 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
             discountPercentage: payload?.discountPercentage,
             commissionAmount: itemCommission,
             clicksCount: clicks,
+            ordersCount: p.ordersCount,
+            actualRevenue: p.actualRevenue,
+            actualCommission: p.actualCommission,
             estimatedRevenue: estRevenue,
             mediaUrl: p.mediaUrl,
             sentAt: p.sentAt,
@@ -346,6 +364,9 @@ export const analyticsRoutes: FastifyPluginAsync = async (fastify) => {
             title: payload?.title || 'Daraz Promo',
             status: d.status,
             clicksCount: d.clicksCount,
+            ordersCount: d.ordersCount,
+            actualRevenue: d.actualRevenue,
+            actualCommission: d.actualCommission,
             createdAt: d.createdAt,
             sentAt: d.sentAt,
           };

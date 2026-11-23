@@ -12,6 +12,19 @@ export interface ExtractedDealData {
   rawText: string;
 }
 
+/**
+ * Attaches Daraz Affiliate Tracking Macros to direct link
+ * Formats: ?sub_aff_id=wa_tam&sub_id1={postId}&sub_id2={language}
+ */
+export function attachDarazSubTracking(rawUrl: string, postId: string, language: 'TAMIL' | 'SINHALA'): string {
+  if (!rawUrl || typeof rawUrl !== 'string' || !rawUrl.startsWith('http')) return rawUrl;
+  if (rawUrl.includes('sub_id1=')) return rawUrl;
+
+  const separator = rawUrl.includes('?') ? '&' : '?';
+  const subAffId = language === 'SINHALA' ? 'wa_sin' : 'wa_tam';
+  return `${rawUrl}${separator}sub_aff_id=${subAffId}&sub_id1=${postId}&sub_id2=${language}`;
+}
+
 export class DarazExtractor {
   /**
    * Extracts URL, product title, prices, and product image from Daraz share text.

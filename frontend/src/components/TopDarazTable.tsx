@@ -11,6 +11,9 @@ interface TopProductItem {
   discountPercentage?: number | string;
   commissionAmount?: number;
   clicksCount: number;
+  ordersCount?: number;
+  actualRevenue?: number;
+  actualCommission?: number;
   estimatedRevenue: number;
   mediaUrl: string | null;
   sentAt: string | null;
@@ -52,10 +55,11 @@ export function TopDarazTable({ items, apiBaseUrl = 'http://localhost:4000' }: T
               <th className="pb-3 font-semibold">Product Deal</th>
               <th className="pb-3 font-semibold text-right">Offer Price</th>
               <th className="pb-3 font-semibold text-center">Discount</th>
-              <th className="pb-3 font-semibold text-right">Bot Comm.</th>
+              <th className="pb-3 font-semibold text-right">Exp. Comm.</th>
               <th className="pb-3 font-semibold text-right">Clicks</th>
-              <th className="pb-3 font-semibold text-right">Est. Comm.</th>
-              <th className="pb-3 font-semibold text-center">Tracking URL</th>
+              <th className="pb-3 font-semibold text-center">Orders</th>
+              <th className="pb-3 font-semibold text-right">Actual Comm.</th>
+              <th className="pb-3 font-semibold text-center">Direct Link</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -113,8 +117,17 @@ export function TopDarazTable({ items, apiBaseUrl = 'http://localhost:4000' }: T
                     ⚡ {item.clicksCount}
                   </span>
                 </td>
+                <td className="py-3.5 text-center">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold font-mono ${
+                    (item.ordersCount ?? 0) > 0 ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' : 'text-slate-400'
+                  }`}>
+                    {item.ordersCount ?? 0}
+                  </span>
+                </td>
                 <td className="py-3.5 text-right font-mono font-bold text-emerald-700">
-                  Rs. {item.estimatedRevenue.toLocaleString()}
+                  {(item.actualCommission ?? 0) > 0 
+                    ? `Rs. ${(item.actualCommission ?? 0).toLocaleString()}` 
+                    : (item.estimatedRevenue > 0 ? `~Rs. ${item.estimatedRevenue.toLocaleString()}` : '—')}
                 </td>
                 <td className="py-3.5 text-center">
                   <a

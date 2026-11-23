@@ -6,6 +6,7 @@ import { copywritingService } from '../services/copywritingService.js';
 import { posterService } from '../services/posterService.js';
 import { wahaClient } from '../services/wahaClient.js';
 import { SettingsService } from '../services/settingsService.js';
+import { attachDarazSubTracking } from '../services/darazExtractor.js';
 import { DarazJobData } from './queueManager.js';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -33,8 +34,11 @@ export function createDarazWorker() {
 
       const payload: any = post.rawPayload || {};
 
-      // 2. Resolve URLs (Direct Daraz Affiliate URL)
+      // 2. Resolve URLs (Direct Daraz Affiliate URL with Auto-Tracking Sub-IDs)
       const directAffiliateUrl = payload.exactAffiliateUrl || payload.affiliateUrl || payload.url || post.sourceRef || '';
+      const trackedTamilUrl = attachDarazSubTracking(directAffiliateUrl, postId, 'TAMIL');
+      const trackedSinhalaUrl = attachDarazSubTracking(directAffiliateUrl, postId, 'SINHALA');
+
       const communityInviteUrl = await SettingsService.get('communityInviteUrl');
       const communityInviteUrlSinhala = await SettingsService.get('communityInviteUrlSinhala');
 
@@ -49,7 +53,8 @@ export function createDarazWorker() {
           originalPrice: payload.originalPrice,
           discountPrice: payload.discountPrice || payload.price,
           discountPercentage: payload.discountPercentage,
-          affiliateRedirectUrl: directAffiliateUrl,
+          affiliateRedirectUrl: trackedTamilUrl,
+          affiliateRedirectUrlSinhala: trackedSinhalaUrl,
           productDetails: payload.productDetails || payload.description,
           category: payload.category,
           communityInviteUrl: communityInviteUrl || undefined,
@@ -60,17 +65,17 @@ export function createDarazWorker() {
         if (!formattedTextSinhala || !formattedTextSinhala.trim()) formattedTextSinhala = bilingual.sinhalaText;
       }
 
-      // Helper to ensure direct affiliate link is used in copy:
-      const sanitizeCopy = (text: string) => {
+      // Helper to ensure tracked direct affiliate link is used in copy:
+      const sanitizeCopy = (text: string, targetUrl: string) => {
         let t = text;
-        if (directAffiliateUrl && (t.includes('localhost:4000/r/') || t.includes('/r/'))) {
-          t = t.replace(/https?:\/\/[^\s]+\/r\/[^\s]+/g, directAffiliateUrl);
+        if (targetUrl && (t.includes('localhost:4000/r/') || t.includes('/r/'))) {
+          t = t.replace(/https?:\/\/[^\s]+\/r\/[^\s]+/g, targetUrl);
         }
         return t;
       };
 
-      formattedTextTamil = sanitizeCopy(formattedTextTamil);
-      formattedTextSinhala = sanitizeCopy(formattedTextSinhala);
+      formattedTextTamil = sanitizeCopy(formattedTextTamil, trackedTamilUrl);
+      formattedTextSinhala = sanitizeCopy(formattedTextSinhala, trackedSinhalaUrl);
 
       // 4. Find Active Destination Groups for DARAZ
       const destinationGroups = await prisma.group.findMany({

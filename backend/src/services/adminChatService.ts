@@ -3,7 +3,7 @@ import { prisma } from '../config/prisma.js';
 import { env } from '../config/env.js';
 import { wahaClient } from './wahaClient.js';
 import { wahaMediaService } from './wahaMediaService.js';
-import { DarazExtractor } from './darazExtractor.js';
+import { DarazExtractor, attachDarazSubTracking } from './darazExtractor.js';
 import { copywritingService } from './copywritingService.js';
 import { SettingsService } from './settingsService.js';
 import { posterService } from './posterService.js';
@@ -338,12 +338,15 @@ export class AdminChatService {
             await wahaClient.sendTextMessage(formattedChatId, `⏳ *Gemini மூலம் புதிய தமிழ் மற்றும் சிங்கள விளம்பரங்கள் தயாராகின்றன...*`);
 
             const directAffiliateUrl = payload.exactAffiliateUrl || payload.affiliateUrl || payload.url || post.sourceRef || '';
+            const trackedTamilUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'TAMIL');
+            const trackedSinhalaUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'SINHALA');
             const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
               title: payload.title,
               originalPrice: payload.originalPrice,
               discountPrice: payload.discountPrice,
               discountPercentage: payload.discountPercentage,
-              affiliateRedirectUrl: directAffiliateUrl,
+              affiliateRedirectUrl: trackedTamilUrl,
+              affiliateRedirectUrlSinhala: trackedSinhalaUrl,
               communityInviteUrl,
               communityInviteUrlSinhala,
             });
@@ -566,8 +569,10 @@ export class AdminChatService {
         },
       });
 
-      // Use Direct Official Daraz Affiliate URL (no intermediate redirect)
+      // Use Direct Official Daraz Affiliate URL with Auto-Tracked Macros
       const directAffiliateUrl = dealData.exactAffiliateUrl || dealData.affiliateUrl || dealData.url || '';
+      const trackedTamilUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'TAMIL');
+      const trackedSinhalaUrl = attachDarazSubTracking(directAffiliateUrl, post.id, 'SINHALA');
 
       // AI Copywriting with Gemini: generate both in parallel
       const { tamilText, sinhalaText } = await copywritingService.generateBilingualDarazDeals({
@@ -575,7 +580,8 @@ export class AdminChatService {
         originalPrice: dealData.originalPrice,
         discountPrice: dealData.discountPrice,
         discountPercentage: dealData.discountPercentage,
-        affiliateRedirectUrl: directAffiliateUrl,
+        affiliateRedirectUrl: trackedTamilUrl,
+        affiliateRedirectUrlSinhala: trackedSinhalaUrl,
         communityInviteUrl,
         communityInviteUrlSinhala,
       });
